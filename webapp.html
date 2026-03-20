@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="theme-color" content="#0f1923">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Control de Campo</title>
+<link rel="manifest" href="manifest.json">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+  :root {
+    --bg:       #0f1923;
+    --surface:  #162030;
+    --card:     #1c2b3a;
+    --border:   #2a3f54;
+    --accent:   #00d4aa;
+    --accent2:  #0090ff;
+    --warn:     #ff6b35;
+    --text:     #e8f0f8;
+    --muted:    #7a95b0;
+    --success:  #00c896;
+    --danger:   #ff4757;
+    --radius:   16px;
+    --mono:     'Space Mono', monospace;
+    --sans:     'DM Sans', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+  }
+
+  /* Background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,170,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,170,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrap {
+    position: relative;
+    z-index: 1;
+    max-width: 440px;
+    margin: 0 auto;
+    padding: 24px 20px 40px;
+    width: 100%;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Header */
+  .hdr {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 32px;
+  }
+  .logo {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--accent);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--muted);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 4px 10px;
+  }
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--success);
+    animation: pulse 2s infinite;
+  }
+  .status-dot.offline { background: var(--warn); animation: none; }
+  @keyframes pulse {
+    0%,100% { opacity: 1; box-shadow: 0 0 0 0 rgba(0,200,150,0.4); }
+    50%      { opacity: .8; box-shadow: 0 0 0 4px rgba(0,200,150,0); }
+  }
+
+  /* Clock */
+  .clock-block {
+    text-align: center;
+    margin-bottom: 28px;
+  }
+  .clock {
+    font-family: var(--mono);
+    font-size: 52px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -2px;
+    line-height: 1;
+  }
+  .clock span { color: var(--accent); }
+  .date-str {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 6px;
+    font-family: var(--mono);
+    letter-spacing: 1px;
+  }
+
+  /* Card */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .card-label {
+    font-size: 11px;
+    font-family: var(--mono);
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  /* Input */
+  .field {
+    position: relative;
+    margin-bottom: 14px;
+  }
+  .field label {
+    display: block;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 6px;
+    font-family: var(--mono);
+    letter-spacing: 1px;
+  }
+  .field input, .field select {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 16px;
+    padding: 12px 14px;
+    outline: none;
+    transition: border-color .2s, box-shadow .2s;
+    -webkit-appearance: none;
+  }
+  .field input:focus, .field select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(0,212,170,0.12);
+  }
+  .field input::placeholder { color: var(--muted); }
+  .field select option { background: var(--card); }
+
+  /* GPS display */
+  .gps-block {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  .gps-icon {
+    width: 28px; height: 28px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  .gps-icon.ok   { background: rgba(0,200,150,0.15); color: var(--success); }
+  .gps-icon.wait { background: rgba(255,107,53,0.15); color: var(--warn); }
+  .gps-icon.err  { background: rgba(255,71,87,0.15);  color: var(--danger); }
+  .gps-coords { color: var(--text); line-height: 1.5; }
+  .gps-coords small { color: var(--muted); display: block; font-size: 10px; }
+  .gps-link { color: var(--accent2); text-decoration: none; font-size: 11px; }
+
+  /* Worker info card */
+  .worker-card {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin-bottom: 14px;
+  }
+  .worker-avatar {
+    width: 38px; height: 38px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono);
+    font-size: 15px;
+    font-weight: 700;
+    color: #0f1923;
+    flex-shrink: 0;
+  }
+  .worker-info { flex: 1; min-width: 0; }
+  .worker-name { font-size: 15px; font-weight: 600; }
+  .worker-id { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+
+  /* Buttons */
+  .btn {
+    width: 100%;
+    border: none;
+    border-radius: 12px;
+    font-family: var(--sans);
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 16px;
+    transition: all .15s;
+    position: relative;
+    overflow: hidden;
+  }
+  .btn:active { transform: scale(.97); }
+  .btn-primary {
+    background: var(--accent);
+    color: #0f1923;
+  }
+  .btn-primary:hover { background: #00efc0; }
+  .btn-primary:disabled {
+    background: var(--border);
+    color: var(--muted);
+    cursor: not-allowed;
+    transform: none;
+  }
+  .btn-entrada {
+    background: linear-gradient(135deg, #00c896, #00d4aa);
+    color: #0f1923;
+    margin-bottom: 12px;
+  }
+  .btn-salida {
+    background: linear-gradient(135deg, #0090ff, #004fd4);
+    color: #fff;
+    margin-bottom: 12px;
+  }
+  .btn-outline {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 13px;
+    padding: 11px;
+  }
+  .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Pending badge */
+  .pending-banner {
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(255,107,53,0.1);
+    border: 1px solid rgba(255,107,53,0.3);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: var(--warn);
+    margin-bottom: 14px;
+  }
+
+  /* Screen management */
+  .screen { display: none; flex-direction: column; flex: 1; }
+  .screen.active { display: flex; }
+
+  /* Success screen */
+  .success-icon {
+    width: 72px; height: 72px;
+    border-radius: 20px;
+    background: rgba(0,200,150,0.15);
+    border: 1px solid rgba(0,200,150,0.3);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 32px;
+    margin: 0 auto 20px;
+    animation: pop .3s cubic-bezier(.34,1.56,.64,1);
+  }
+  @keyframes pop { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .success-title { font-size: 22px; font-weight: 600; text-align: center; margin-bottom: 8px; }
+  .success-sub   { font-size: 14px; color: var(--muted); text-align: center; line-height: 1.6; margin-bottom: 24px; }
+
+  .detail-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .detail-row:last-child { border-bottom: none; }
+  .detail-row .k { color: var(--muted); font-family: var(--mono); font-size: 11px; letter-spacing: 1px; }
+  .detail-row .v { font-weight: 500; text-align: right; max-width: 60%; }
+  .v.entrada { color: var(--success); }
+  .v.salida  { color: var(--accent2); }
+  .v.offline { color: var(--warn); }
+
+  .toast {
+    position: fixed;
+    bottom: 24px; left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 10px 20px;
+    font-size: 13px;
+    z-index: 100;
+    transition: transform .3s cubic-bezier(.34,1.2,.64,1);
+    white-space: nowrap;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  .spinner {
+    display: inline-block;
+    width: 16px; height: 16px;
+    border: 2px solid rgba(15,25,35,0.3);
+    border-top-color: #0f1923;
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .offline-indicator {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    background: var(--warn);
+    color: #fff;
+    font-size: 12px;
+    font-family: var(--mono);
+    text-align: center;
+    padding: 6px;
+    transform: translateY(-100%);
+    transition: transform .3s;
+    z-index: 200;
+  }
+  .offline-indicator.visible { transform: translateY(0); }
+</style>
+</head>
+<body>
+
+<div class="offline-indicator" id="offlineBanner">SIN CONEXIÓN — Los registros se guardarán localmente</div>
+
+<div class="wrap">
+
+  <!-- SCREEN 1: Login -->
+  <div class="screen active" id="s-login">
+    <div class="hdr">
+      <div class="logo">▸ CAMPO</div>
+      <div class="status-pill">
+        <div class="status-dot" id="netDot"></div>
+        <span id="netTxt">EN LÍNEA</span>
+      </div>
+    </div>
+
+    <div class="clock-block">
+      <div class="clock" id="clockEl">00<span>:</span>00<span>:</span>00</div>
+      <div class="date-str" id="dateEl">—</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Identificación</div>
+      <div class="field">
+        <label>DNI o ID del sistema</label>
+        <input type="text" id="dniInput" placeholder="Ej: 12345678"
+               inputmode="numeric" maxlength="20" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Nombre completo</label>
+        <input type="text" id="nameInput" placeholder="Nombre y apellido"
+               autocomplete="off" style="text-transform:uppercase">
+      </div>
+    </div>
+
+    <button class="btn btn-primary" id="btnLogin">Continuar →</button>
+  </div>
+
+  <!-- SCREEN 2: Registrar -->
+  <div class="screen" id="s-register">
+    <div class="hdr">
+      <div class="logo">▸ CAMPO</div>
+      <div class="status-pill">
+        <div class="status-dot" id="netDot2"></div>
+        <span id="netTxt2">EN LÍNEA</span>
+      </div>
+    </div>
+
+    <div class="clock-block">
+      <div class="clock" id="clockEl2">00<span>:</span>00<span>:</span>00</div>
+      <div class="date-str" id="dateEl2">—</div>
+    </div>
+
+    <div id="pendingBanner" class="pending-banner" style="display:none">
+      <span>⚡</span>
+      <span><strong id="pendingCount">0</strong> registro(s) pendiente(s) de sincronizar</span>
+    </div>
+
+    <div class="worker-card">
+      <div class="worker-avatar" id="avatarEl">--</div>
+      <div class="worker-info">
+        <div class="worker-name" id="workerNameEl">—</div>
+        <div class="worker-id" id="workerIdEl">—</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Ubicación GPS</div>
+      <div class="gps-block" id="gpsBlock">
+        <div class="gps-icon wait" id="gpsIcon">◎</div>
+        <div class="gps-coords">
+          <span id="gpsText">Obteniendo ubicación…</span>
+          <small id="gpsAccuracy"></small>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn btn-entrada" id="btnEntrada">↑ Registrar ENTRADA</button>
+    <button class="btn btn-salida"  id="btnSalida">↓ Registrar SALIDA</button>
+    <button class="btn btn-outline" id="btnLogout">Cambiar usuario</button>
+  </div>
+
+  <!-- SCREEN 3: Éxito -->
+  <div class="screen" id="s-success">
+    <div class="hdr">
+      <div class="logo">▸ CAMPO</div>
+      <div class="status-pill">
+        <div class="status-dot" id="netDot3"></div>
+        <span id="netTxt3">EN LÍNEA</span>
+      </div>
+    </div>
+
+    <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:20px 0">
+      <div class="success-icon" id="successIcon">✓</div>
+      <div class="success-title" id="successTitle">Registro exitoso</div>
+      <div class="success-sub"   id="successSub">Su asistencia ha sido registrada.</div>
+
+      <div class="card" id="successDetail">
+        <!-- filled by JS -->
+      </div>
+    </div>
+
+    <button class="btn btn-primary" id="btnBack">← Nuevo registro</button>
+  </div>
+
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════
+// CONFIGURACIÓN — editar según su implementación
+// ═══════════════════════════════════════════════════
+const CONFIG = {
+  // URL del Google Apps Script Web App (ver instrucciones)
+  SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxuGPuNaEFzF9IxWt5lHk7_NhfOASuD4dDmrNucpAztpANlrn5qKcccKCw0_G-U2RPc/exec',
+  APP_NAME: 'Control de Campo',
+  COMPANY: 'Mi Empresa'
+};
+// ═══════════════════════════════════════════════════
+
+const DIAS = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+let gpsCoords = null;
+let currentUser = null;
+let isOnline = navigator.onLine;
+
+// ─── Clock ───────────────────────────────────────
+function updateClock() {
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2,'0');
+  const mm = String(now.getMinutes()).padStart(2,'0');
+  const ss = String(now.getSeconds()).padStart(2,'0');
+  const timeStr = `${hh}<span>:</span>${mm}<span>:</span>${ss}`;
+  const dateStr = `${DIAS[now.getDay()]} ${now.getDate()} ${MESES[now.getMonth()]} ${now.getFullYear()}`;
+  ['clockEl','clockEl2'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.innerHTML = timeStr;
+  });
+  ['dateEl','dateEl2'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.textContent = dateStr;
+  });
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ─── Online/Offline ──────────────────────────────
+function setOnlineStatus(online) {
+  isOnline = online;
+  const dots = ['netDot','netDot2','netDot3'];
+  const txts = ['netTxt','netTxt2','netTxt3'];
+  dots.forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.className = 'status-dot' + (online ? '' : ' offline');
+  });
+  txts.forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.textContent = online ? 'EN LÍNEA' : 'SIN SEÑAL';
+  });
+  document.getElementById('offlineBanner').className =
+    'offline-indicator' + (online ? '' : ' visible');
+  if(online) syncPending();
+  updatePendingBadge();
+}
+window.addEventListener('online',  () => setOnlineStatus(true));
+window.addEventListener('offline', () => setOnlineStatus(false));
+setOnlineStatus(navigator.onLine);
+
+// ─── GPS ─────────────────────────────────────────
+function startGPS() {
+  const icon = document.getElementById('gpsIcon');
+  const text = document.getElementById('gpsText');
+  const acc  = document.getElementById('gpsAccuracy');
+
+  if(!navigator.geolocation) {
+    icon.className = 'gps-icon err';
+    icon.textContent = '✗';
+    text.textContent = 'GPS no disponible en este dispositivo';
+    return;
+  }
+
+  icon.className = 'gps-icon wait';
+  icon.textContent = '◎';
+  text.textContent = 'Obteniendo ubicación…';
+  acc.textContent = '';
+
+  navigator.geolocation.watchPosition(
+    pos => {
+      gpsCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude, acc: Math.round(pos.coords.accuracy) };
+      icon.className = 'gps-icon ok';
+      icon.textContent = '◉';
+      const lat = gpsCoords.lat.toFixed(6);
+      const lng = gpsCoords.lng.toFixed(6);
+      const link = `https://maps.google.com/?q=${lat},${lng}`;
+      text.innerHTML = `${lat}, ${lng} <a class="gps-link" href="${link}" target="_blank">Ver mapa ↗</a>`;
+      acc.textContent = `Precisión: ±${gpsCoords.acc}m`;
+    },
+    err => {
+      icon.className = 'gps-icon err';
+      icon.textContent = '✗';
+      if(err.code === 1) {
+        text.textContent = 'Permiso de ubicación denegado. Active el GPS.';
+      } else {
+        text.textContent = 'No se pudo obtener la ubicación.';
+      }
+      gpsCoords = null;
+    },
+    { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
+  );
+}
+
+// ─── Screens ─────────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ─── Toast ───────────────────────────────────────
+function showToast(msg, dur=2800) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), dur);
+}
+
+// ─── Pending records (offline storage) ───────────
+function getPending() {
+  try { return JSON.parse(localStorage.getItem('pending_records') || '[]'); }
+  catch(e) { return []; }
+}
+function savePending(records) {
+  localStorage.setItem('pending_records', JSON.stringify(records));
+}
+function addPending(record) {
+  const p = getPending();
+  p.push(record);
+  savePending(p);
+  updatePendingBadge();
+}
+function updatePendingBadge() {
+  const p = getPending();
+  const banner = document.getElementById('pendingBanner');
+  const count  = document.getElementById('pendingCount');
+  if(p.length > 0) {
+    banner.style.display = 'flex';
+    count.textContent = p.length;
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
+// ─── Send to Google Sheets ────────────────────────
+async function sendRecord(record) {
+  const url = CONFIG.SCRIPT_URL + '?' + new URLSearchParams(record).toString();
+  const resp = await fetch(url, { method: 'GET', mode: 'no-cors' });
+  return true;
+}
+
+async function syncPending() {
+  const pending = getPending();
+  if(pending.length === 0) return;
+  const failed = [];
+  for(const rec of pending) {
+    try {
+      await sendRecord(rec);
+    } catch(e) {
+      failed.push(rec);
+    }
+  }
+  savePending(failed);
+  if(pending.length > failed.length) {
+    showToast(`✓ ${pending.length - failed.length} registro(s) sincronizado(s)`);
+  }
+  updatePendingBadge();
+}
+
+// ─── Register action ─────────────────────────────
+async function registerAction(tipo) {
+  if(!gpsCoords) {
+    showToast('⚠ Esperando GPS. Asegúrese de tener el GPS activado.');
+    return;
+  }
+
+  const now = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  const fecha = `${pad(now.getDate())}/${pad(now.getMonth()+1)}/${now.getFullYear()}`;
+  const hora  = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+
+  const record = {
+    dni:      currentUser.dni,
+    nombre:   currentUser.nombre,
+    fecha:    fecha,
+    hora:     hora,
+    tipo:     tipo,
+    lat:      gpsCoords.lat.toFixed(7),
+    lng:      gpsCoords.lng.toFixed(7),
+    precision: gpsCoords.acc,
+    maps_url: `https://maps.google.com/?q=${gpsCoords.lat.toFixed(7)},${gpsCoords.lng.toFixed(7)}`,
+    offline:  isOnline ? 'NO' : 'SI',
+    ts:       now.toISOString()
+  };
+
+  const btn = tipo === 'Entrada' ? document.getElementById('btnEntrada') : document.getElementById('btnSalida');
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner"></span> Enviando…`;
+
+  let sent = false;
+  if(isOnline) {
+    try {
+      await sendRecord(record);
+      sent = true;
+    } catch(e) {
+      sent = false;
+    }
+  }
+
+  if(!sent) {
+    addPending(record);
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = tipo === 'Entrada' ? '↑ Registrar ENTRADA' : '↓ Registrar SALIDA';
+
+  // Show success screen
+  const icon = document.getElementById('successIcon');
+  const title = document.getElementById('successTitle');
+  const sub   = document.getElementById('successSub');
+  const detail= document.getElementById('successDetail');
+
+  icon.textContent = tipo === 'Entrada' ? '↑' : '↓';
+  icon.style.background = tipo === 'Entrada'
+    ? 'rgba(0,200,150,0.15)' : 'rgba(0,144,255,0.15)';
+  title.textContent = tipo === 'Entrada' ? 'Entrada registrada' : 'Salida registrada';
+  sub.textContent = sent
+    ? 'Registro enviado correctamente al servidor.'
+    : 'Sin señal — Guardado en el dispositivo. Se sincronizará automáticamente.';
+
+  detail.innerHTML = `
+    <div class="detail-row">
+      <span class="k">TRABAJADOR</span>
+      <span class="v">${record.nombre}</span>
+    </div>
+    <div class="detail-row">
+      <span class="k">DNI / ID</span>
+      <span class="v">${record.dni}</span>
+    </div>
+    <div class="detail-row">
+      <span class="k">TIPO</span>
+      <span class="v ${tipo.toLowerCase()}">${tipo.toUpperCase()}</span>
+    </div>
+    <div class="detail-row">
+      <span class="k">FECHA</span>
+      <span class="v">${fecha}</span>
+    </div>
+    <div class="detail-row">
+      <span class="k">HORA</span>
+      <span class="v">${hora}</span>
+    </div>
+    <div class="detail-row">
+      <span class="k">UBICACIÓN</span>
+      <span class="v"><a class="gps-link" href="${record.maps_url}" target="_blank">${record.lat}, ${record.lng} ↗</a></span>
+    </div>
+    <div class="detail-row">
+      <span class="k">ESTADO</span>
+      <span class="v ${!sent ? 'offline' : ''}">${sent ? '✓ Enviado' : '⚡ Pendiente sync'}</span>
+    </div>
+  `;
+
+  showScreen('s-success');
+}
+
+// ─── Login ────────────────────────────────────────
+document.getElementById('btnLogin').addEventListener('click', () => {
+  const dni  = document.getElementById('dniInput').value.trim();
+  const name = document.getElementById('nameInput').value.trim().toUpperCase();
+  if(!dni)  { showToast('⚠ Ingrese su DNI o ID'); return; }
+  if(!name) { showToast('⚠ Ingrese su nombre'); return; }
+  currentUser = { dni, nombre: name };
+  const initials = name.split(' ').map(w=>w[0]).join('').slice(0,2);
+  document.getElementById('avatarEl').textContent    = initials;
+  document.getElementById('workerNameEl').textContent = name;
+  document.getElementById('workerIdEl').textContent   = 'DNI: ' + dni;
+  showScreen('s-register');
+  startGPS();
+  updatePendingBadge();
+});
+
+document.getElementById('btnLogout').addEventListener('click', () => {
+  currentUser = null; gpsCoords = null;
+  document.getElementById('dniInput').value  = '';
+  document.getElementById('nameInput').value = '';
+  showScreen('s-login');
+});
+
+document.getElementById('btnEntrada').addEventListener('click', () => registerAction('Entrada'));
+document.getElementById('btnSalida').addEventListener('click',  () => registerAction('Salida'));
+document.getElementById('btnBack').addEventListener('click', () => showScreen('s-register'));
+
+// Enter key on login
+document.getElementById('nameInput').addEventListener('keydown', e => {
+  if(e.key === 'Enter') document.getElementById('btnLogin').click();
+});
+
+// Auto sync on load
+if(isOnline) syncPending();
+</script>
+</body>
+</html>
