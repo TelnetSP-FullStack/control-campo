@@ -358,6 +358,25 @@
   }
   .offline-indicator.visible { transform: translateY(0); }
 </style>
+<style>
+  .btn-install {
+    display: none;
+    width: 100%;
+    background: linear-gradient(135deg, #00d4aa22, #0090ff22);
+    border: 1px solid var(--accent);
+    border-radius: 12px;
+    color: var(--accent);
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 12px;
+    margin-bottom: 12px;
+    transition: all .15s;
+  }
+  .btn-install.visible { display: block; }
+  .btn-install:active { transform: scale(.97); }
+</style>
 </head>
 <body>
 
@@ -394,6 +413,9 @@
 
     <button class="btn btn-primary" id="btnLogin">
       <span id="btnLoginTxt">Verificar DNI →</span>
+    </button>
+    <button class="btn-install" id="btnInstall">
+      ⊕ Instalar app en este dispositivo
     </button>
   </div>
 
@@ -883,6 +905,36 @@ document.getElementById('dniInput').addEventListener('keydown', e => {
 
 // Auto sync on load
 if(isOnline) syncPending();
+
+// ─── PWA Install Prompt ───────────────────────────────────────
+let deferredPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  document.getElementById('btnInstall').classList.add('visible');
+});
+
+document.getElementById('btnInstall').addEventListener('click', async () => {
+  if(!deferredPrompt) return;
+  deferredPrompt.prompt();
+  const { outcome } = await deferredPrompt.userChoice;
+  if(outcome === 'accepted') {
+    document.getElementById('btnInstall').classList.remove('visible');
+    showToast('✓ App instalada correctamente');
+  }
+  deferredPrompt = null;
+});
+
+window.addEventListener('appinstalled', () => {
+  document.getElementById('btnInstall').classList.remove('visible');
+  deferredPrompt = null;
+});
+
+// ─── Service Worker (offline cache) ──────────────────────────
+if('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
 </script>
 </body>
 </html>
