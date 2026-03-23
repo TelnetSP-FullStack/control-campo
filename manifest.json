@@ -1,7 +1,7 @@
 {
-  "name": "Control de Campo",
-  "short_name": "Campo",
-  "description": "Registro de asistencia con GPS para personal de campo",
+  "name": "Asistencia Personal Campo",
+  "short_name": "TelnetSP",
+  "description": "Telnet SP — Registro de asistencia con GPS para personal de campo",
   "start_url": "./webapp.html",
   "scope": "./",
   "display": "standalone",
@@ -41,5 +41,6 @@
         }
       ]
     }
-  ]
+  ],
+  "id": "com.telnetsp.asistencia-campo"
 }
