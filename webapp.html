@@ -387,14 +387,53 @@
         <input type="text" id="dniInput" placeholder="Ej: 12345678"
                inputmode="numeric" maxlength="20" autocomplete="off">
       </div>
-      <div class="field">
-        <label>Nombre completo</label>
-        <input type="text" id="nameInput" placeholder="Nombre y apellido"
-               autocomplete="off" style="text-transform:uppercase">
+      <div id="loginError" style="display:none;background:rgba(255,71,87,0.1);border:1px solid rgba(255,71,87,0.3);border-radius:10px;padding:10px 14px;font-size:13px;color:var(--danger);margin-top:4px;">
+        <span id="loginErrorMsg"></span>
       </div>
     </div>
 
-    <button class="btn btn-primary" id="btnLogin">Continuar →</button>
+    <button class="btn btn-primary" id="btnLogin">
+      <span id="btnLoginTxt">Verificar DNI →</span>
+    </button>
+  </div>
+
+  <!-- SCREEN 1.5: Confirmar identidad -->
+  <div class="screen" id="s-confirm">
+    <div class="hdr">
+      <div class="logo">▸ CAMPO</div>
+      <div class="status-pill">
+        <div class="status-dot" id="netDot4"></div>
+        <span id="netTxt4">EN LÍNEA</span>
+      </div>
+    </div>
+
+    <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:10px 0">
+      <div style="text-align:center;margin-bottom:28px;">
+        <div style="font-family:var(--mono);font-size:11px;letter-spacing:2px;color:var(--muted);margin-bottom:12px;">VERIFICACIÓN DE IDENTIDAD</div>
+        <div style="font-size:14px;color:var(--muted);line-height:1.6;">Se encontró el siguiente registro.<br>¿Es usted esta persona?</div>
+      </div>
+
+      <div class="card" style="margin-bottom:24px;">
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">
+          <div class="worker-avatar" id="confirmAvatar" style="width:52px;height:52px;font-size:20px;border-radius:14px;">--</div>
+          <div>
+            <div style="font-size:18px;font-weight:600;" id="confirmName">—</div>
+            <div style="font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:3px;" id="confirmDni">—</div>
+          </div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px;">
+          <div style="font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:1px;margin-bottom:4px;">CARGO</div>
+          <div style="font-size:14px;font-weight:500;" id="confirmCargo">—</div>
+        </div>
+      </div>
+
+      <button class="btn btn-entrada" id="btnConfirmSi" style="margin-bottom:12px;">
+        ✓ Sí, soy yo — Continuar
+      </button>
+      <button class="btn btn-outline" id="btnConfirmNo">
+        ✗ No soy yo — Volver
+      </button>
+    </div>
   </div>
 
   <!-- SCREEN 2: Registrar -->
@@ -484,9 +523,10 @@ const CONFIG = {
 const DIAS = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
 const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 
-let gpsCoords = null;
+let gpsCoords   = null;
 let currentUser = null;
-let isOnline = navigator.onLine;
+let pendingUser = null;
+let isOnline    = navigator.onLine;
 
 // ─── Clock ───────────────────────────────────────
 function updateClock() {
@@ -511,8 +551,8 @@ updateClock();
 // ─── Online/Offline ──────────────────────────────
 function setOnlineStatus(online) {
   isOnline = online;
-  const dots = ['netDot','netDot2','netDot3'];
-  const txts = ['netTxt','netTxt2','netTxt3'];
+  const dots = ['netDot','netDot2','netDot3','netDot4'];
+  const txts = ['netTxt','netTxt2','netTxt3','netTxt4'];
   dots.forEach(id => {
     const el = document.getElementById(id);
     if(el) el.className = 'status-dot' + (online ? '' : ' offline');
@@ -653,6 +693,7 @@ async function registerAction(tipo) {
   const record = {
     dni:      currentUser.dni,
     nombre:   currentUser.nombre,
+    cargo:    currentUser.cargo || '',
     fecha:    fecha,
     hora:     hora,
     tipo:     tipo,
@@ -734,34 +775,109 @@ async function registerAction(tipo) {
 }
 
 // ─── Login ────────────────────────────────────────
-document.getElementById('btnLogin').addEventListener('click', () => {
-  const dni  = document.getElementById('dniInput').value.trim();
-  const name = document.getElementById('nameInput').value.trim().toUpperCase();
-  if(!dni)  { showToast('⚠ Ingrese su DNI o ID'); return; }
-  if(!name) { showToast('⚠ Ingrese su nombre'); return; }
-  currentUser = { dni, nombre: name };
-  const initials = name.split(' ').map(w=>w[0]).join('').slice(0,2);
-  document.getElementById('avatarEl').textContent    = initials;
-  document.getElementById('workerNameEl').textContent = name;
-  document.getElementById('workerIdEl').textContent   = 'DNI: ' + dni;
+document.getElementById('btnLogin').addEventListener('click', async () => {
+  const dni = document.getElementById('dniInput').value.trim();
+  if(!dni) { showToast('⚠ Ingrese su DNI o ID'); return; }
+
+  // Hide previous error
+  document.getElementById('loginError').style.display = 'none';
+
+  // Show loading state
+  const btn    = document.getElementById('btnLogin');
+  const btnTxt = document.getElementById('btnLoginTxt');
+  btn.disabled = true;
+  btnTxt.innerHTML = '<span class="spinner"></span> Verificando…';
+
+  try {
+    const url  = CONFIG.SCRIPT_URL + '?action=validar&dni=' + encodeURIComponent(dni);
+    const resp = await fetch(url);
+    const data = await resp.json();
+
+    if(data.status === 'ok') {
+      // DNI válido — mostrar pantalla de confirmación
+      const name  = data.nombre.toUpperCase();
+      const cargo = data.cargo || '';
+      // Guardar temporalmente hasta que confirme
+      pendingUser = { dni: data.dni, nombre: name, cargo };
+      const initials = name.split(' ').map(w=>w[0]).join('').slice(0,2);
+      document.getElementById('confirmAvatar').textContent = initials;
+      document.getElementById('confirmName').textContent   = name;
+      document.getElementById('confirmDni').textContent    = 'DNI: ' + data.dni;
+      document.getElementById('confirmCargo').textContent  = cargo || 'Sin cargo asignado';
+      showScreen('s-confirm');
+    } else {
+      // DNI no encontrado o inactivo
+      const errMsg = data.msg || 'DNI no registrado. Contacte al administrador.';
+      document.getElementById('loginErrorMsg').textContent = '⚠ ' + errMsg;
+      document.getElementById('loginError').style.display = 'block';
+      document.getElementById('dniInput').focus();
+    }
+  } catch(e) {
+    // Sin conexión — modo offline: pedir nombre manualmente
+    showModalOfflineLogin(dni);
+  } finally {
+    btn.disabled = false;
+    btnTxt.textContent = 'Verificar DNI →';
+  }
+});
+
+document.getElementById('btnLogout').addEventListener('click', () => {
+  currentUser = null; pendingUser = null; gpsCoords = null;
+  document.getElementById('dniInput').value = '';
+  document.getElementById('loginError').style.display = 'none';
+  showScreen('s-login');
+});
+
+// Confirmación de identidad
+document.getElementById('btnConfirmSi').addEventListener('click', () => {
+  if(!pendingUser) { showScreen('s-login'); return; }
+  currentUser = pendingUser;
+  pendingUser = null;
+  const initials = currentUser.nombre.split(' ').map(w=>w[0]).join('').slice(0,2);
+  document.getElementById('avatarEl').textContent     = initials;
+  document.getElementById('workerNameEl').textContent = currentUser.nombre;
+  document.getElementById('workerIdEl').textContent   =
+    'DNI: ' + currentUser.dni + (currentUser.cargo ? '  |  ' + currentUser.cargo : '');
   showScreen('s-register');
   startGPS();
   updatePendingBadge();
 });
 
-document.getElementById('btnLogout').addEventListener('click', () => {
-  currentUser = null; gpsCoords = null;
-  document.getElementById('dniInput').value  = '';
-  document.getElementById('nameInput').value = '';
+document.getElementById('btnConfirmNo').addEventListener('click', () => {
+  pendingUser = null;
+  document.getElementById('dniInput').value = '';
+  document.getElementById('loginError').style.display = 'none';
   showScreen('s-login');
+  showToast('Ingrese su DNI correcto.');
 });
+
+// Offline fallback: ask name manually when no internet
+function showModalOfflineLogin(dni) {
+  const name = prompt(
+    'Sin conexión para verificar DNI.\n\nIngrese su nombre completo para continuar en modo offline:',
+    ''
+  );
+  if(!name || name.trim() === '') {
+    showToast('⚠ Nombre requerido para modo offline');
+    return;
+  }
+  const nameUp = name.trim().toUpperCase();
+  // En modo offline, mostrar confirmación igual
+  pendingUser = { dni, nombre: nameUp, cargo: 'Modo offline' };
+  const initials = nameUp.split(' ').map(w=>w[0]).join('').slice(0,2);
+  document.getElementById('confirmAvatar').textContent = initials;
+  document.getElementById('confirmName').textContent   = nameUp;
+  document.getElementById('confirmDni').textContent    = 'DNI: ' + dni;
+  document.getElementById('confirmCargo').textContent  = '⚡ Sin conexión — datos sin verificar';
+  showScreen('s-confirm');
+}
 
 document.getElementById('btnEntrada').addEventListener('click', () => registerAction('Entrada'));
 document.getElementById('btnSalida').addEventListener('click',  () => registerAction('Salida'));
 document.getElementById('btnBack').addEventListener('click', () => showScreen('s-register'));
 
 // Enter key on login
-document.getElementById('nameInput').addEventListener('keydown', e => {
+document.getElementById('dniInput').addEventListener('keydown', e => {
   if(e.key === 'Enter') document.getElementById('btnLogin').click();
 });
 
