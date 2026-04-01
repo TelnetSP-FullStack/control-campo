@@ -713,6 +713,7 @@ async function registerAction(tipo) {
   const hora  = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
 
   const record = {
+    action:   'registrar',
     dni:      currentUser.dni,
     nombre:   currentUser.nombre,
     cargo:    currentUser.cargo || '',
@@ -724,6 +725,7 @@ async function registerAction(tipo) {
     precision: gpsCoords.acc,
     maps_url: `https://maps.google.com/?q=${gpsCoords.lat.toFixed(7)},${gpsCoords.lng.toFixed(7)}`,
     offline:  isOnline ? 'NO' : 'SI',
+    fuente:   'App',
     ts:       now.toISOString()
   };
 
