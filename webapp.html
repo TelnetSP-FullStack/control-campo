@@ -379,7 +379,6 @@
 </style>
 
 <style>
-  /* ── Selector de ubicacion en pantalla de confirmacion ── */
   .ub-label {
     font-family: var(--mono);
     font-size: 11px;
@@ -416,10 +415,7 @@
     background: rgba(0,212,170,0.08);
     color: var(--accent);
   }
-  .ub-otra-wrap {
-    display: none;
-    margin-top: 10px;
-  }
+  .ub-otra-wrap { display: none; margin-top: 10px; }
   .ub-otra-wrap.visible { display: block; }
   .ub-otra-wrap input {
     width: 100%;
@@ -440,13 +436,7 @@
     box-shadow: 0 0 0 3px rgba(0,212,170,0.12);
   }
   .ub-otra-wrap input::placeholder { color: var(--muted); }
-  .ub-error {
-    display: none;
-    font-size: 12px;
-    color: var(--danger);
-    margin-top: 6px;
-    font-family: var(--mono);
-  }
+  .ub-error { display: none; font-size: 12px; color: var(--danger); margin-top: 6px; font-family: var(--mono); }
   .ub-error.visible { display: block; }
 </style>
 </head>
@@ -521,7 +511,6 @@
         </div>
       </div>
 
-      <!-- Selector de lugar de trabajo -->
       <div class="ub-label">Lugar de trabajo</div>
       <div class="ub-grid">
         <div class="ub-btn" id="ubOficina" onclick="selUb('Oficina Principal')">
@@ -534,7 +523,7 @@
       <div class="ub-otra-wrap" id="ubOtraWrap">
         <input type="text" id="ubOtraInput" placeholder="Ej: Campo Norte, Almacén…" maxlength="80">
       </div>
-      <div class="ub-error" id="ubError">Seleccione o escriba su lugar de trabajo.</div>
+      <div class="ub-error" id="ubError">Seleccione su lugar de trabajo para continuar.</div>
 
       <button class="btn btn-entrada" id="btnConfirmSi" style="margin-top:18px;margin-bottom:12px;">
         ✓ Sí, soy yo — Continuar
@@ -623,7 +612,7 @@
 // ═══════════════════════════════════════════════════
 const CONFIG = {
   // URL del Google Apps Script Web App (ver instrucciones)
-  SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbzpoFvhUCSbf3TSzbUxDXP6W4eMnvhka9SWSxGmd_5rER_ol6HMXBKn1x5rdQAZg9YqmQ/exec',
+  SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbwwjEKXnIXWNYjJXQgZi3DpYM0_YuVvQvB3VFy1t-H2qmQdK5iPfQ5vBeCAQhetWge1Wg/exec',
   APP_NAME: 'Control de Campo',
   COMPANY: 'Telnet SP'
 };
@@ -636,20 +625,18 @@ let gpsCoords            = null;
 let currentUser          = null;
 let pendingUser          = null;
 let isOnline             = navigator.onLine;
-let ubicacionSeleccionada = '';   // Lugar de trabajo confirmado por el usuario
+let ubicacionSeleccionada = '';
 
 // ─── Ubicacion selector ──────────────────────────
 function selUb(val) {
-  const btnOf  = document.getElementById('ubOficina');
-  const btnOt  = document.getElementById('ubOtra');
-  const wrap   = document.getElementById('ubOtraWrap');
-  const input  = document.getElementById('ubOtraInput');
-  const err    = document.getElementById('ubError');
-
+  const btnOf = document.getElementById('ubOficina');
+  const btnOt = document.getElementById('ubOtra');
+  const wrap  = document.getElementById('ubOtraWrap');
+  const input = document.getElementById('ubOtraInput');
+  const err   = document.getElementById('ubError');
   btnOf.classList.remove('active');
   btnOt.classList.remove('active');
   err.classList.remove('visible');
-
   if(val === 'Oficina Principal') {
     btnOf.classList.add('active');
     wrap.classList.remove('visible');
@@ -660,7 +647,6 @@ function selUb(val) {
     setTimeout(() => input.focus(), 100);
   }
 }
-
 function resetUbicacion() {
   ubicacionSeleccionada = '';
   document.getElementById('ubOficina').classList.remove('active');
@@ -982,29 +968,20 @@ document.getElementById('btnLogout').addEventListener('click', () => {
 // Confirmación de identidad + validacion de ubicacion
 document.getElementById('btnConfirmSi').addEventListener('click', () => {
   if(!pendingUser) { showScreen('s-login'); return; }
-
-  // Validar ubicacion seleccionada
-  const btnOf  = document.getElementById('ubOficina');
-  const btnOt  = document.getElementById('ubOtra');
-  const input  = document.getElementById('ubOtraInput');
-  const err    = document.getElementById('ubError');
-
+  const btnOf = document.getElementById('ubOficina');
+  const btnOt = document.getElementById('ubOtra');
+  const input = document.getElementById('ubOtraInput');
+  const err   = document.getElementById('ubError');
   if(btnOf.classList.contains('active')) {
     ubicacionSeleccionada = 'Oficina Principal';
   } else if(btnOt.classList.contains('active')) {
     const val = input.value.trim();
-    if(!val) {
-      err.classList.add('visible');
-      input.focus();
-      return;
-    }
+    if(!val) { err.classList.add('visible'); input.focus(); return; }
     ubicacionSeleccionada = val;
   } else {
-    err.textContent = 'Seleccione su lugar de trabajo para continuar.';
     err.classList.add('visible');
     return;
   }
-
   err.classList.remove('visible');
   currentUser = pendingUser;
   pendingUser = null;
