@@ -357,6 +357,89 @@
     z-index: 200;
   }
   .offline-indicator.visible { transform: translateY(0); }
+
+<style>
+  /* Modal ubicacion */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(4px);
+    z-index: 300;
+    align-items: flex-end;
+    justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal-sheet {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 24px 24px 0 0;
+    padding: 28px 24px 40px;
+    width: 100%;
+    max-width: 440px;
+    animation: slideUp .3s cubic-bezier(.34,1.2,.64,1);
+  }
+  @keyframes slideUp {
+    from { transform: translateY(100%); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+  .modal-handle {
+    width: 40px; height: 4px;
+    background: var(--border);
+    border-radius: 100px;
+    margin: 0 auto 20px;
+  }
+  .modal-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .modal-sub {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 20px;
+    line-height: 1.5;
+  }
+  .ubicacion-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .ub-option {
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 10px;
+    text-align: center;
+    cursor: pointer;
+    transition: all .15s;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    line-height: 1.4;
+  }
+  .ub-option:hover  { border-color: var(--accent); color: var(--accent); }
+  .ub-option.active { border-color: var(--accent); background: rgba(0,212,170,0.08); color: var(--accent); }
+  .ub-option .ub-icon { font-size: 22px; display: block; margin-bottom: 6px; }
+  .ub-otra-field { display: none; margin-bottom: 16px; }
+  .ub-otra-field.visible { display: block; }
+  .ubicacion-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(0,212,170,0.1);
+    border: 1px solid rgba(0,212,170,0.3);
+    border-radius: 100px;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-family: var(--mono);
+    color: var(--accent);
+    margin-top: 8px;
+    cursor: pointer;
+  }
+  .ubicacion-tag:hover { background: rgba(0,212,170,0.18); }
 </style>
 <style>
   .btn-install {
@@ -497,6 +580,16 @@
       </div>
     </div>
 
+    <div class="card" id="cardUbicacion">
+      <div class="card-label">Lugar de trabajo</div>
+      <div id="ubicacionDisplay" style="display:none;">
+        <span class="ubicacion-tag" id="ubicacionTag" onclick="abrirModalUbicacion()">📍 <span id="ubicacionTagTxt"></span> ✎</span>
+      </div>
+      <div id="ubicacionPrompt" style="font-size:13px;color:var(--muted);margin-top:2px;">
+        Seleccione su lugar de trabajo antes de registrar entrada.
+      </div>
+    </div>
+
     <button class="btn btn-entrada" id="btnEntrada">↑ Registrar ENTRADA</button>
     <button class="btn btn-salida"  id="btnSalida">↓ Registrar SALIDA</button>
     <button class="btn btn-outline" id="btnLogout">Cambiar usuario</button>
@@ -527,6 +620,41 @@
 
 </div>
 
+<!-- MODAL UBICACION -->
+<div class="modal-overlay" id="modalUbicacion">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">📍 Lugar de trabajo</div>
+    <div class="modal-sub">Seleccione o escriba el lugar donde realizará sus actividades hoy.</div>
+    <div class="ubicacion-options" id="ubOptions">
+      <div class="ub-option" data-val="Oficina Principal" onclick="selUbicacion(this)">
+        <span class="ub-icon">🏢</span>Oficina Principal
+      </div>
+      <div class="ub-option" data-val="Campo Norte" onclick="selUbicacion(this)">
+        <span class="ub-icon">🏗️</span>Campo Norte
+      </div>
+      <div class="ub-option" data-val="Campo Sur" onclick="selUbicacion(this)">
+        <span class="ub-icon">🏗️</span>Campo Sur
+      </div>
+      <div class="ub-option" data-val="__otra__" onclick="selUbicacion(this)">
+        <span class="ub-icon">✏️</span>Otra ubicación
+      </div>
+    </div>
+    <div class="ub-otra-field" id="ubOtraField">
+      <div class="field" style="margin-bottom:0;">
+        <label>Especifique el lugar</label>
+        <input type="text" id="ubOtraInput" placeholder="Ej: Almacén Central, Planta B…" maxlength="80">
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnConfirmarUbicacion" onclick="confirmarUbicacion()" disabled>
+      Confirmar ubicación
+    </button>
+    <button class="btn btn-outline" style="margin-top:10px;" onclick="cerrarModalUbicacion()">
+      Cancelar
+    </button>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
@@ -545,10 +673,92 @@ const CONFIG = {
 const DIAS = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
 const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 
-let gpsCoords   = null;
-let currentUser = null;
-let pendingUser = null;
-let isOnline    = navigator.onLine;
+let gpsCoords            = null;
+let currentUser          = null;
+let pendingUser          = null;
+let isOnline             = navigator.onLine;
+let ubicacionSeleccionada = '';   // Lugar de trabajo seleccionado
+
+// ─── Modal Ubicacion ─────────────────────────────
+function abrirModalUbicacion() {
+  document.getElementById('modalUbicacion').classList.add('open');
+  // Restaurar seleccion previa si existe
+  if(ubicacionSeleccionada) {
+    document.querySelectorAll('.ub-option').forEach(op => {
+      op.classList.remove('active');
+      if(op.dataset.val === ubicacionSeleccionada ||
+         (op.dataset.val === '__otra__' && !document.querySelector(`.ub-option[data-val="${ubicacionSeleccionada}"]`))) {
+        op.classList.add('active');
+      }
+    });
+    const otraField = document.getElementById('ubOtraField');
+    const otraInput = document.getElementById('ubOtraInput');
+    const esOtra = !['Oficina Principal','Campo Norte','Campo Sur'].includes(ubicacionSeleccionada);
+    if(esOtra) {
+      otraField.classList.add('visible');
+      otraInput.value = ubicacionSeleccionada;
+      document.querySelector('.ub-option[data-val="__otra__"]').classList.add('active');
+    }
+  }
+  document.getElementById('btnConfirmarUbicacion').disabled = !ubicacionSeleccionada;
+}
+
+function cerrarModalUbicacion() {
+  document.getElementById('modalUbicacion').classList.remove('open');
+}
+
+function selUbicacion(el) {
+  document.querySelectorAll('.ub-option').forEach(o => o.classList.remove('active'));
+  el.classList.add('active');
+  const otraField = document.getElementById('ubOtraField');
+  const otraInput = document.getElementById('ubOtraInput');
+  if(el.dataset.val === '__otra__') {
+    otraField.classList.add('visible');
+    otraInput.focus();
+    otraInput.value = '';
+    document.getElementById('btnConfirmarUbicacion').disabled = true;
+  } else {
+    otraField.classList.remove('visible');
+    otraInput.value = '';
+    document.getElementById('btnConfirmarUbicacion').disabled = false;
+  }
+}
+
+function confirmarUbicacion() {
+  const activo = document.querySelector('.ub-option.active');
+  if(!activo) { showToast('⚠ Seleccione un lugar'); return; }
+  if(activo.dataset.val === '__otra__') {
+    const val = document.getElementById('ubOtraInput').value.trim();
+    if(!val) { showToast('⚠ Escriba el nombre del lugar'); return; }
+    ubicacionSeleccionada = val;
+  } else {
+    ubicacionSeleccionada = activo.dataset.val;
+  }
+  document.getElementById('ubicacionTagTxt').textContent = ubicacionSeleccionada;
+  document.getElementById('ubicacionDisplay').style.display = 'block';
+  document.getElementById('ubicacionPrompt').style.display = 'none';
+  cerrarModalUbicacion();
+  showToast('📍 ' + ubicacionSeleccionada);
+}
+
+// Cerrar modal al tocar el overlay
+document.addEventListener('click', e => {
+  const overlay = document.getElementById('modalUbicacion');
+  if(e.target === overlay) cerrarModalUbicacion();
+});
+
+// Habilitar boton confirmar al escribir en "otra"
+document.addEventListener('DOMContentLoaded', () => {
+  const otraInput = document.getElementById('ubOtraInput');
+  if(otraInput) {
+    otraInput.addEventListener('input', () => {
+      document.getElementById('btnConfirmarUbicacion').disabled = otraInput.value.trim() === '';
+    });
+    otraInput.addEventListener('keydown', e => {
+      if(e.key === 'Enter') confirmarUbicacion();
+    });
+  }
+});
 
 // ─── Clock ───────────────────────────────────────
 function updateClock() {
@@ -706,6 +916,12 @@ async function registerAction(tipo) {
     showToast('⚠ Esperando GPS. Asegúrese de tener el GPS activado.');
     return;
   }
+  // Ubicacion obligatoria solo para Entrada
+  if(tipo === 'Entrada' && !ubicacionSeleccionada) {
+    abrirModalUbicacion();
+    showToast('⚠ Seleccione su lugar de trabajo primero.');
+    return;
+  }
 
   const now = new Date();
   const pad = n => String(n).padStart(2,'0');
@@ -713,10 +929,10 @@ async function registerAction(tipo) {
   const hora  = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
 
   const record = {
-    action:   'registrar',
     dni:      currentUser.dni,
     nombre:   currentUser.nombre,
     cargo:    currentUser.cargo || '',
+    ubicacion: tipo === 'Entrada' ? ubicacionSeleccionada : (ubicacionSeleccionada || ''),
     fecha:    fecha,
     hora:     hora,
     tipo:     tipo,
@@ -725,7 +941,6 @@ async function registerAction(tipo) {
     precision: gpsCoords.acc,
     maps_url: `https://maps.google.com/?q=${gpsCoords.lat.toFixed(7)},${gpsCoords.lng.toFixed(7)}`,
     offline:  isOnline ? 'NO' : 'SI',
-    fuente:   'App',
     ts:       now.toISOString()
   };
 
@@ -777,6 +992,10 @@ async function registerAction(tipo) {
       <span class="k">TIPO</span>
       <span class="v ${tipo.toLowerCase()}">${tipo.toUpperCase()}</span>
     </div>
+    ${record.ubicacion ? `<div class="detail-row">
+      <span class="k">LUGAR</span>
+      <span class="v">📍 ${record.ubicacion}</span>
+    </div>` : ''}
     <div class="detail-row">
       <span class="k">FECHA</span>
       <span class="v">${fecha}</span>
@@ -847,6 +1066,9 @@ document.getElementById('btnLogin').addEventListener('click', async () => {
 
 document.getElementById('btnLogout').addEventListener('click', () => {
   currentUser = null; pendingUser = null; gpsCoords = null;
+  ubicacionSeleccionada = '';
+  document.getElementById('ubicacionDisplay').style.display = 'none';
+  document.getElementById('ubicacionPrompt').style.display = 'block';
   document.getElementById('dniInput').value = '';
   document.getElementById('loginError').style.display = 'none';
   showScreen('s-login');
@@ -897,6 +1119,11 @@ function showModalOfflineLogin(dni) {
 }
 
 document.getElementById('btnEntrada').addEventListener('click', () => registerAction('Entrada'));
+document.getElementById('cardUbicacion').addEventListener('click', e => {
+  if(!e.target.classList.contains('ubicacion-tag') && !e.target.closest('.ubicacion-tag')) {
+    abrirModalUbicacion();
+  }
+});
 document.getElementById('btnSalida').addEventListener('click',  () => registerAction('Salida'));
 document.getElementById('btnBack').addEventListener('click', () => showScreen('s-register'));
 
