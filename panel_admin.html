@@ -385,7 +385,12 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       <div class="page" id="page-marcaciones">
         <div class="page-hdr">
           <div><div class="page-title">Marcaciones</div><div class="page-sub">Registro de asistencia — corrección manual</div></div>
+          <div style="display:flex;gap:10px;align-items:center">
+            <div id="agenteStatus" style="font-size:11px;font-family:var(--mono);color:var(--muted)">Verificando agente…</div>
+            <button class="btn btn-primary" id="btnExtraerBio">⬇ Extraer biométrico</button>
+          </div>
         </div>
+        <div id="extraerResult" style="display:none;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px;font-family:var(--mono);font-size:12px"></div>
         <div class="data-table-wrap">
           <div class="table-toolbar">
             <input type="date" id="filtroFechaMarca" class="search-box" style="flex:0;width:auto">
@@ -1546,6 +1551,98 @@ async function toggleUsuario(id, activo) {
   try { await sbPatch('panel_usuarios', id, { activo: !activo }); toast(`Usuario ${activo?'desactivado':'activado'}`); cargarUsuarios(); }
   catch(e) { toast('Error: ' + e.message, 'error'); }
 }
+
+// ═══════════════════════════════════════════════════════════════
+//  AGENTE BIOMÉTRICO
+//  El agente corre en el servidor de la oficina en localhost:8765
+//  El panel se comunica con él para disparar extracciones manuales
+// ═══════════════════════════════════════════════════════════════
+const AGENTE_URL = 'http://localhost:8765';
+
+async function verificarAgente() {
+  const el = document.getElementById('agenteStatus');
+  if (!el) return;
+  try {
+    const r = await fetch(AGENTE_URL + '/ping', { signal: AbortSignal.timeout(3000) });
+    const d = await r.json();
+    if (d.status === 'ok') {
+      el.innerHTML = '<span style="color:var(--success)">● Agente conectado</span>';
+    } else {
+      el.innerHTML = '<span style="color:var(--danger)">● Agente sin respuesta</span>';
+    }
+  } catch {
+    el.innerHTML = '<span style="color:var(--warn)">● Agente no disponible</span>';
+  }
+}
+
+document.getElementById('btnExtraerBio').addEventListener('click', async () => {
+  const resultDiv = document.getElementById('extraerResult');
+  const btn = document.getElementById('btnExtraerBio');
+
+  // Pedir rango de fechas
+  const hoy = new Date().toISOString().slice(0,10);
+  const ayer = new Date(Date.now() - 86400000).toISOString().slice(0,10);
+  const ini  = prompt('Fecha inicio (YYYY-MM-DD):', ayer);
+  if (!ini) return;
+  const fin  = prompt('Fecha fin (YYYY-MM-DD):', hoy);
+  if (!fin) return;
+
+  btn.innerHTML = '<span class="spinner"></span> Extrayendo…';
+  btn.disabled  = true;
+  resultDiv.style.display = 'none';
+
+  try {
+    const r = await fetch(
+      `${AGENTE_URL}/extraer?ini=${ini}&fin=${fin}`,
+      { signal: AbortSignal.timeout(120000) }  // 2 minutos timeout
+    );
+    const d = await r.json();
+
+    const color = d.errores > 0 ? 'var(--warn)' : 'var(--success)';
+    resultDiv.style.display = 'block';
+    resultDiv.innerHTML = `
+      <div style="color:${color};margin-bottom:8px;font-size:13px;font-weight:600">
+        ${d.error ? '✗ Error en la extracción' : '✓ Extracción completada'}
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px">
+        <div>Período: <strong>${d.fecha_ini} → ${d.fecha_fin}</strong></div>
+        <div>En rango: <strong style="color:var(--accent)">${d.en_rango}</strong></div>
+        <div>Insertados: <strong style="color:var(--success)">${d.insertados}</strong></div>
+        <div>Duplicados: <strong style="color:var(--muted)">${d.duplicados}</strong></div>
+      </div>
+      ${d.error ? `<div style="color:var(--danger)">${d.error}</div>` : ''}
+      ${d.errores > 0 ? `<div style="color:var(--warn)">${d.errores} registros con error — revisar log del agente</div>` : ''}
+    `;
+
+    if (d.insertados > 0) {
+      toast(`✓ ${d.insertados} marcaciones importadas del biométrico`, 'success');
+      // Recargar marcaciones si está en la página correcta
+      setTimeout(cargarMarcaciones, 1000);
+    } else if (!d.error) {
+      toast('Sin registros nuevos en el período seleccionado');
+    }
+  } catch(e) {
+    resultDiv.style.display = 'block';
+    resultDiv.innerHTML = `
+      <div style="color:var(--danger);margin-bottom:8px">✗ No se pudo conectar al agente</div>
+      <div style="color:var(--muted);font-size:11px">
+        Verifique que el agente está corriendo en el servidor de la oficina.<br>
+        El agente debe estar en la misma red que el biométrico.<br>
+        Comando para iniciar: <strong>python agente_biometrico.py --servidor</strong>
+      </div>
+    `;
+    toast('Agente no disponible', 'error');
+  } finally {
+    btn.innerHTML = '⬇ Extraer biométrico';
+    btn.disabled  = false;
+  }
+});
+
+// Verificar estado del agente al cargar la página de marcaciones
+const _origCargarMarcaciones = window.cargarMarcaciones;
+document.querySelector('[data-page="marcaciones"]').addEventListener('click', () => {
+  setTimeout(verificarAgente, 500);
+});
 </script>
 </body>
 </html>
