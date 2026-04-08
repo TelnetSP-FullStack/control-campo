@@ -785,13 +785,16 @@ async function registerAction(tipo) {
 
   const now = new Date();
   const pad = n => String(n).padStart(2,'0');
-  const fecha = `${pad(now.getDate())}/${pad(now.getMonth()+1)}/${now.getFullYear()}`;
+  // Fecha para mostrar al usuario
+  const fechaDisplay = `${pad(now.getDate())}/${pad(now.getMonth()+1)}/${now.getFullYear()}`;
+  // Fecha para la base de datos (YYYY-MM-DD requerido por PostgreSQL)
+  const fechaDB = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
   const hora  = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
 
   const record = {
     dni:       currentUser.dni,
     ubicacion: ubicacionSeleccionada || '',
-    fecha:     fecha,
+    fecha:     fechaDB,
     hora:     hora,
     tipo:     tipo,
     lat:      gpsCoords.lat.toFixed(7),
@@ -857,7 +860,7 @@ async function registerAction(tipo) {
     </div>` : ''}
     <div class="detail-row">
       <span class="k">FECHA</span>
-      <span class="v">${fecha}</span>
+      <span class="v">${fechaDisplay}</span>
     </div>
     <div class="detail-row">
       <span class="k">HORA</span>
