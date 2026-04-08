@@ -1,0 +1,1551 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TelnetSP — Panel de Administración</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #0d1117;
+  --surface:  #161b22;
+  --card:     #1c2330;
+  --border:   #30363d;
+  --accent:   #00d4aa;
+  --accent2:  #388bfd;
+  --warn:     #f0883e;
+  --danger:   #f85149;
+  --success:  #3fb950;
+  --text:     #e6edf3;
+  --muted:    #8b949e;
+  --mono:     'IBM Plex Mono', monospace;
+  --sans:     'IBM Plex Sans', sans-serif;
+  --radius:   8px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column}
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 39px,rgba(48,54,61,0.3) 40px),repeating-linear-gradient(90deg,transparent,transparent 39px,rgba(48,54,61,0.3) 40px);pointer-events:none;z-index:0}
+
+/* ── Login ─────────────────────────────────────────────────────── */
+#login-screen{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;background:var(--bg)}
+.login-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:48px 40px;width:380px;position:relative;z-index:1}
+.login-logo{font-family:var(--mono);font-size:11px;letter-spacing:3px;color:var(--accent);margin-bottom:32px;text-transform:uppercase}
+.login-title{font-size:22px;font-weight:600;margin-bottom:6px}
+.login-sub{font-size:13px;color:var(--muted);margin-bottom:32px}
+.field{margin-bottom:16px}
+.field label{display:block;font-size:11px;font-family:var(--mono);letter-spacing:1px;color:var(--muted);margin-bottom:6px;text-transform:uppercase}
+.field input{width:100%;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--mono);font-size:14px;padding:10px 14px;outline:none;transition:border-color .2s}
+.field input:focus{border-color:var(--accent)}
+.btn-login{width:100%;background:var(--accent);color:#0d1117;border:none;border-radius:var(--radius);font-family:var(--sans);font-size:15px;font-weight:600;padding:12px;cursor:pointer;transition:opacity .15s;margin-top:8px}
+.btn-login:hover{opacity:.9}
+.login-error{display:none;font-size:12px;color:var(--danger);font-family:var(--mono);margin-top:10px;text-align:center}
+
+/* ── Layout principal ───────────────────────────────────────────── */
+#app{display:none;flex:1;flex-direction:column}
+#app.visible{display:flex}
+
+/* Header */
+.hdr{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.hdr-left{display:flex;align-items:center;gap:16px}
+.hdr-logo{font-family:var(--mono);font-size:12px;letter-spacing:2px;color:var(--accent);font-weight:600}
+.hdr-sep{width:1px;height:20px;background:var(--border)}
+.hdr-module{font-size:13px;color:var(--muted)}
+.hdr-right{display:flex;align-items:center;gap:12px}
+.user-pill{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--border);border-radius:100px;padding:4px 12px 4px 6px}
+.user-avatar{width:24px;height:24px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:#0d1117}
+.user-name{font-size:12px;font-family:var(--mono)}
+.role-badge{font-size:10px;font-family:var(--mono);padding:2px 8px;border-radius:100px;letter-spacing:1px}
+.role-admin{background:rgba(0,212,170,0.15);color:var(--accent)}
+.role-jefe{background:rgba(56,139,253,0.15);color:var(--accent2)}
+.role-consulta{background:rgba(139,148,158,0.15);color:var(--muted)}
+.btn-logout{background:none;border:1px solid var(--border);color:var(--muted);border-radius:var(--radius);font-size:12px;padding:4px 10px;cursor:pointer;transition:all .15s}
+.btn-logout:hover{border-color:var(--danger);color:var(--danger)}
+
+/* Body layout */
+.body{display:flex;flex:1;overflow:hidden}
+
+/* Sidebar */
+.sidebar{width:220px;background:var(--surface);border-right:1px solid var(--border);padding:16px 0;flex-shrink:0;overflow-y:auto}
+.nav-section{padding:6px 16px;font-size:10px;font-family:var(--mono);letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-top:8px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:8px 16px;font-size:13px;cursor:pointer;transition:background .15s;border-left:2px solid transparent;color:var(--muted)}
+.nav-item:hover{background:var(--card);color:var(--text)}
+.nav-item.active{background:rgba(0,212,170,0.08);color:var(--accent);border-left-color:var(--accent)}
+.nav-item .nav-ico{width:16px;text-align:center;font-size:14px}
+.nav-item .nav-badge{margin-left:auto;background:var(--accent);color:#0d1117;font-size:10px;font-family:var(--mono);border-radius:100px;padding:1px 6px;display:none}
+.nav-item .nav-badge.visible{display:block}
+
+/* Main content */
+.main{flex:1;overflow-y:auto;padding:24px}
+
+/* Cards y paneles */
+.page{display:none}
+.page.active{display:block}
+.page-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.page-title{font-size:18px;font-weight:600}
+.page-sub{font-size:13px;color:var(--muted);margin-top:2px}
+
+/* Tabla de datos */
+.data-table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.table-toolbar{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border)}
+.search-box{flex:1;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--mono);font-size:13px;padding:7px 12px;outline:none;transition:border-color .2s}
+.search-box:focus{border-color:var(--accent)}
+.search-box::placeholder{color:var(--muted)}
+.btn{border:none;border-radius:var(--radius);font-family:var(--sans);font-size:13px;font-weight:500;padding:7px 14px;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:var(--accent);color:#0d1117}
+.btn-primary:hover{opacity:.9}
+.btn-secondary{background:var(--card);border:1px solid var(--border);color:var(--text)}
+.btn-secondary:hover{border-color:var(--accent);color:var(--accent)}
+.btn-danger{background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.3);color:var(--danger)}
+.btn-danger:hover{background:rgba(248,81,73,0.2)}
+.btn-sm{padding:4px 10px;font-size:12px}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;padding:10px 16px;font-size:11px;font-family:var(--mono);letter-spacing:1px;color:var(--muted);text-transform:uppercase;border-bottom:1px solid var(--border);font-weight:400}
+td{padding:10px 16px;font-size:13px;border-bottom:1px solid rgba(48,54,61,0.5)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,0.02)}
+.badge{display:inline-flex;align-items:center;font-size:11px;font-family:var(--mono);border-radius:100px;padding:2px 10px;font-weight:400}
+.badge-green{background:rgba(63,185,80,0.15);color:var(--success)}
+.badge-red{background:rgba(248,81,73,0.15);color:var(--danger)}
+.badge-blue{background:rgba(56,139,253,0.15);color:var(--accent2)}
+.badge-amber{background:rgba(240,136,62,0.15);color:var(--warn)}
+.badge-teal{background:rgba(0,212,170,0.15);color:var(--accent)}
+.badge-gray{background:rgba(139,148,158,0.15);color:var(--muted)}
+.empty-state{text-align:center;padding:60px 20px;color:var(--muted)}
+.empty-state .empty-ico{font-size:40px;margin-bottom:12px;opacity:.4}
+.empty-state p{font-size:14px}
+
+/* Modal */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:200;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;width:640px;max-height:90vh;overflow-y:auto;position:relative}
+.modal-hdr{padding:20px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--surface);z-index:1}
+.modal-title{font-size:16px;font-weight:600}
+.modal-close{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:0 4px;line-height:1}
+.modal-close:hover{color:var(--text)}
+.modal-body{padding:20px 24px}
+.modal-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;position:sticky;bottom:0;background:var(--surface)}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.form-grid .full{grid-column:1/-1}
+.form-field{display:flex;flex-direction:column;gap:5px}
+.form-field label{font-size:11px;font-family:var(--mono);letter-spacing:1px;color:var(--muted);text-transform:uppercase}
+.form-field input,.form-field select,.form-field textarea{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--mono);font-size:13px;padding:8px 12px;outline:none;transition:border-color .2s;width:100%}
+.form-field input:focus,.form-field select:focus,.form-field textarea:focus{border-color:var(--accent)}
+.form-field select option{background:var(--card)}
+.form-field textarea{resize:vertical;min-height:72px;font-family:var(--sans)}
+.form-section{grid-column:1/-1;font-size:11px;font-family:var(--mono);letter-spacing:2px;color:var(--accent);text-transform:uppercase;padding-top:8px;border-top:1px solid var(--border);margin-top:4px}
+
+/* Toast */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:10px 18px;font-size:13px;z-index:300;transform:translateY(80px);opacity:0;transition:all .3s;max-width:340px}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.success{border-color:rgba(63,185,80,0.4);color:var(--success)}
+.toast.error{border-color:rgba(248,81,73,0.4);color:var(--danger)}
+
+/* Spinner */
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(13,17,23,0.3);border-top-color:#0d1117;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Stats cards */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+.stat-val{font-size:28px;font-weight:600;font-family:var(--mono);line-height:1}
+.stat-label{font-size:11px;color:var(--muted);margin-top:4px;font-family:var(--mono);letter-spacing:1px}
+.stat-card.accent .stat-val{color:var(--accent)}
+.stat-card.blue .stat-val{color:var(--accent2)}
+.stat-card.warn .stat-val{color:var(--warn)}
+.stat-card.danger .stat-val{color:var(--danger)}
+
+/* Tabs en modal */
+.modal-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);padding:0 24px}
+.modal-tab{font-size:13px;padding:10px 16px;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s}
+.modal-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+
+/* Responsive */
+@media(max-width:768px){
+  .sidebar{display:none}
+  .stats-row{grid-template-columns:1fr 1fr}
+  .form-grid{grid-template-columns:1fr}
+  .modal{width:95vw}
+}
+</style>
+</head>
+<body>
+
+<!-- ── LOGIN ─────────────────────────────────────────────────── -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">▸ TELNET SP</div>
+    <div class="login-title">Panel de Administración</div>
+    <div class="login-sub">Acceso restringido a personal autorizado</div>
+    <div class="field">
+      <label>Usuario</label>
+      <input type="text" id="loginUser" placeholder="usuario" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>Contraseña</label>
+      <input type="password" id="loginPass" placeholder="••••••••">
+    </div>
+    <button class="btn-login" id="btnLogin">Ingresar →</button>
+    <div class="login-error" id="loginError">Usuario o contraseña incorrectos</div>
+  </div>
+</div>
+
+<!-- ── APP ───────────────────────────────────────────────────── -->
+<div id="app">
+
+  <!-- Header -->
+  <header class="hdr">
+    <div class="hdr-left">
+      <div class="hdr-logo">▸ TELNET SP</div>
+      <div class="hdr-sep"></div>
+      <div class="hdr-module" id="hdrModule">Panel de Administración</div>
+    </div>
+    <div class="hdr-right">
+      <div class="user-pill">
+        <div class="user-avatar" id="userAvatar">A</div>
+        <span class="user-name" id="userName">admin</span>
+        <span class="role-badge role-admin" id="roleBadge">ADMIN</span>
+      </div>
+      <button class="btn-logout" id="btnLogout">Salir</button>
+    </div>
+  </header>
+
+  <div class="body">
+    <!-- Sidebar -->
+    <nav class="sidebar">
+      <div class="nav-section">Principal</div>
+      <div class="nav-item active" data-page="trabajadores">
+        <span class="nav-ico">👤</span>Trabajadores
+      </div>
+      <div class="nav-item" data-page="horarios">
+        <span class="nav-ico">🕐</span>Horarios
+      </div>
+      <div class="nav-item" data-page="asignaciones">
+        <span class="nav-ico">📋</span>Asignaciones
+      </div>
+      <div class="nav-section">Ausencias</div>
+      <div class="nav-item" data-page="permisos">
+        <span class="nav-ico">📝</span>Permisos
+        <span class="nav-badge" id="badgePermisos">0</span>
+      </div>
+      <div class="nav-item" data-page="feriados">
+        <span class="nav-ico">🗓️</span>Feriados
+      </div>
+      <div class="nav-section">Asistencia</div>
+      <div class="nav-item" data-page="marcaciones">
+        <span class="nav-ico">📍</span>Marcaciones
+      </div>
+      <div class="nav-item" data-page="reportes">
+        <span class="nav-ico">📊</span>Reportes
+      </div>
+      <div class="nav-section">Sistema</div>
+      <div class="nav-item" data-page="usuarios">
+        <span class="nav-ico">🔐</span>Usuarios panel
+      </div>
+    </nav>
+
+    <!-- Main -->
+    <main class="main">
+
+      <!-- ── PÁGINA: TRABAJADORES ───────────────────────────── -->
+      <div class="page active" id="page-trabajadores">
+        <div class="page-hdr">
+          <div>
+            <div class="page-title">Trabajadores</div>
+            <div class="page-sub">Gestión del padrón de personal</div>
+          </div>
+          <button class="btn btn-primary" id="btnNuevoTrab">+ Nuevo trabajador</button>
+        </div>
+
+        <div class="stats-row" id="statsRow">
+          <div class="stat-card accent"><div class="stat-val" id="statTotal">—</div><div class="stat-label">Total registrados</div></div>
+          <div class="stat-card blue"><div class="stat-val" id="statActivos">—</div><div class="stat-label">Activos</div></div>
+          <div class="stat-card warn"><div class="stat-val" id="statCampo">—</div><div class="stat-label">Personal campo</div></div>
+          <div class="stat-card danger"><div class="stat-val" id="statInactivos">—</div><div class="stat-label">Inactivos / cesados</div></div>
+        </div>
+
+        <div class="data-table-wrap">
+          <div class="table-toolbar">
+            <input class="search-box" id="searchTrab" placeholder="Buscar por nombre, DNI o cargo…">
+            <select id="filtroTipo" class="search-box" style="flex:0;width:auto;padding:7px 10px">
+              <option value="">Todos</option>
+              <option value="Administrativo">Administrativo</option>
+              <option value="Campo">Campo</option>
+              <option value="Mixto">Mixto</option>
+            </select>
+            <select id="filtroEstado" class="search-box" style="flex:0;width:auto;padding:7px 10px">
+              <option value="">Activos e inactivos</option>
+              <option value="true">Solo activos</option>
+              <option value="false">Solo inactivos</option>
+            </select>
+            <button class="btn btn-secondary" id="btnRefreshTrab">↺ Actualizar</button>
+          </div>
+          <table id="tablaTrab">
+            <thead>
+              <tr>
+                <th>DNI</th>
+                <th>Nombre completo</th>
+                <th>Cargo</th>
+                <th>Tipo</th>
+                <th>Horario vigente</th>
+                <th>Sueldo</th>
+                <th>Pensión</th>
+                <th>Estado</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="tbodyTrab">
+              <tr><td colspan="9"><div class="empty-state"><div class="empty-ico">⏳</div><p>Cargando…</p></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── PÁGINA: HORARIOS ───────────────────────────────── -->
+      <div class="page" id="page-horarios">
+        <div class="page-hdr">
+          <div><div class="page-title">Horarios</div><div class="page-sub">Catálogo de turnos de trabajo</div></div>
+          <button class="btn btn-primary" id="btnNuevoHorario">+ Nuevo horario</button>
+        </div>
+        <div class="data-table-wrap">
+          <table id="tablaHorarios">
+            <thead>
+              <tr><th>Código</th><th>Nombre</th><th>Días</th><th>Entrada</th><th>Salida</th><th>Refrigerio</th><th>Tolerancia</th><th>Tipo</th><th></th></tr>
+            </thead>
+            <tbody id="tbodyHorarios">
+              <tr><td colspan="9"><div class="empty-state"><div class="empty-ico">⏳</div><p>Cargando…</p></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── PÁGINA: ASIGNACIONES ───────────────────────────── -->
+      <div class="page" id="page-asignaciones">
+        <div class="page-hdr">
+          <div><div class="page-title">Asignación de horarios</div><div class="page-sub">Historial de horarios por trabajador</div></div>
+          <button class="btn btn-primary" id="btnNuevaAsig">+ Nueva asignación</button>
+        </div>
+        <div class="data-table-wrap">
+          <table>
+            <thead>
+              <tr><th>Trabajador</th><th>Horario</th><th>Desde</th><th>Hasta</th><th>Motivo</th><th></th></tr>
+            </thead>
+            <tbody id="tbodyAsig">
+              <tr><td colspan="6"><div class="empty-state"><div class="empty-ico">⏳</div><p>Cargando…</p></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── PÁGINA: PERMISOS ───────────────────────────────── -->
+      <div class="page" id="page-permisos">
+        <div class="page-hdr">
+          <div><div class="page-title">Permisos y vacaciones</div><div class="page-sub">Gestión de ausencias justificadas</div></div>
+          <button class="btn btn-primary" id="btnNuevoPermiso">+ Nuevo permiso</button>
+        </div>
+        <div class="data-table-wrap">
+          <div class="table-toolbar">
+            <select id="filtroEstadoPerm" class="search-box" style="flex:0;width:auto;padding:7px 10px">
+              <option value="">Todos los estados</option>
+              <option value="Pendiente">Pendientes</option>
+              <option value="Aprobado">Aprobados</option>
+              <option value="Rechazado">Rechazados</option>
+            </select>
+            <button class="btn btn-secondary" id="btnRefreshPermisos">↺ Actualizar</button>
+          </div>
+          <table>
+            <thead>
+              <tr><th>Trabajador</th><th>Tipo</th><th>Desde</th><th>Hasta</th><th>Días</th><th>Goce</th><th>Estado</th><th></th></tr>
+            </thead>
+            <tbody id="tbodyPermisos">
+              <tr><td colspan="8"><div class="empty-state"><div class="empty-ico">⏳</div><p>Cargando…</p></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── PÁGINA: FERIADOS ───────────────────────────────── -->
+      <div class="page" id="page-feriados">
+        <div class="page-hdr">
+          <div><div class="page-title">Feriados</div><div class="page-sub">Días no laborables</div></div>
+          <button class="btn btn-primary" id="btnNuevoFeriado">+ Nuevo feriado</button>
+        </div>
+        <div class="data-table-wrap">
+          <table>
+            <thead>
+              <tr><th>Fecha</th><th>Descripción</th><th>Tipo</th><th>Aplica a</th><th></th></tr>
+            </thead>
+            <tbody id="tbodyFeriados">
+              <tr><td colspan="5"><div class="empty-state"><div class="empty-ico">⏳</div><p>Cargando…</p></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── PÁGINA: MARCACIONES ────────────────────────────── -->
+      <div class="page" id="page-marcaciones">
+        <div class="page-hdr">
+          <div><div class="page-title">Marcaciones</div><div class="page-sub">Registro de asistencia — corrección manual</div></div>
+        </div>
+        <div class="data-table-wrap">
+          <div class="table-toolbar">
+            <input type="date" id="filtroFechaMarca" class="search-box" style="flex:0;width:auto">
+            <input class="search-box" id="searchMarca" placeholder="Buscar por DNI o nombre…">
+            <button class="btn btn-secondary" id="btnRefreshMarca">↺ Actualizar</button>
+          </div>
+          <table>
+            <thead>
+              <tr><th>DNI</th><th>Trabajador</th><th>Fecha</th><th>Hora</th><th>Tipo</th><th>Fuente</th><th>Ubicación</th><th>Estado</th><th></th></tr>
+            </thead>
+            <tbody id="tbodyMarca">
+              <tr><td colspan="9"><div class="empty-state"><div class="empty-ico">⏳</div><p>Seleccione una fecha para filtrar</p></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── PÁGINA: REPORTES ───────────────────────────────── -->
+      <div class="page" id="page-reportes">
+        <div class="page-hdr">
+          <div><div class="page-title">Reportes de asistencia</div><div class="page-sub">Resumen mensual por trabajador</div></div>
+        </div>
+        <div style="display:flex;gap:10px;margin-bottom:16px">
+          <input type="month" id="filtroMesReporte" class="search-box" style="width:auto">
+          <button class="btn btn-primary" id="btnCargarReporte">Cargar reporte</button>
+        </div>
+        <div class="data-table-wrap">
+          <table>
+            <thead>
+              <tr><th>Trabajador</th><th>Tipo</th><th>Días asistidos</th><th>Tardanzas</th><th>Faltas</th><th>Horas trabajadas</th><th>H. Extra</th><th>Permisos</th></tr>
+            </thead>
+            <tbody id="tbodyReporte">
+              <tr><td colspan="8"><div class="empty-state"><div class="empty-ico">📊</div><p>Seleccione un mes y haga clic en Cargar reporte</p></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── PÁGINA: USUARIOS PANEL ─────────────────────────── -->
+      <div class="page" id="page-usuarios">
+        <div class="page-hdr">
+          <div><div class="page-title">Usuarios del panel</div><div class="page-sub">Gestión de accesos de administración</div></div>
+          <button class="btn btn-primary" id="btnNuevoUsuario">+ Nuevo usuario</button>
+        </div>
+        <div class="data-table-wrap">
+          <table>
+            <thead>
+              <tr><th>Usuario</th><th>Nombre</th><th>Rol</th><th>Área</th><th>Último acceso</th><th>Estado</th><th></th></tr>
+            </thead>
+            <tbody id="tbodyUsuarios">
+              <tr><td colspan="7"><div class="empty-state"><div class="empty-ico">⏳</div><p>Cargando…</p></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- ── MODAL TRABAJADOR ──────────────────────────────────────── -->
+<div class="modal-overlay" id="modalTrab">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div class="modal-title" id="modalTrabTitle">Nuevo trabajador</div>
+      <button class="modal-close" onclick="cerrarModal('modalTrab')">×</button>
+    </div>
+    <div class="modal-tabs">
+      <div class="modal-tab active" data-tab="personal">Personal</div>
+      <div class="modal-tab" data-tab="laboral">Laboral</div>
+      <div class="modal-tab" data-tab="remuneracion">Remuneración</div>
+    </div>
+    <div class="modal-body">
+      <div id="tab-personal" class="tab-content">
+        <div class="form-grid">
+          <div class="form-field"><label>DNI *</label><input id="tDni" placeholder="12345678" maxlength="12"></div>
+          <div class="form-field"><label>ID Biométrico</label><input id="tBioId" placeholder="BIO001"></div>
+          <div class="form-field"><label>Nombres *</label><input id="tNombres" placeholder="Juan Carlos"></div>
+          <div class="form-field"><label>Apellido paterno *</label><input id="tApPat" placeholder="García"></div>
+          <div class="form-field"><label>Apellido materno</label><input id="tApMat" placeholder="López"></div>
+          <div class="form-field"><label>Fecha nacimiento</label><input type="date" id="tFechaNac"></div>
+          <div class="form-field"><label>Sexo</label>
+            <select id="tSexo"><option value="">—</option><option value="M">Masculino</option><option value="F">Femenino</option></select>
+          </div>
+          <div class="form-field"><label>Teléfono</label><input id="tTelefono" placeholder="999 888 777"></div>
+          <div class="form-field full"><label>Email</label><input type="email" id="tEmail" placeholder="juan@empresa.com"></div>
+          <div class="form-field full"><label>Dirección</label><input id="tDireccion" placeholder="Av. Principal 123, Lima"></div>
+        </div>
+      </div>
+      <div id="tab-laboral" class="tab-content" style="display:none">
+        <div class="form-grid">
+          <div class="form-field"><label>Cargo *</label><input id="tCargo" placeholder="Técnico de campo"></div>
+          <div class="form-field"><label>Área</label><input id="tArea" placeholder="Operaciones"></div>
+          <div class="form-field"><label>Tipo de trabajador *</label>
+            <select id="tTipoTrab">
+              <option value="Administrativo">Administrativo</option>
+              <option value="Campo">Campo</option>
+              <option value="Mixto">Mixto</option>
+            </select>
+          </div>
+          <div class="form-field"><label>Tipo de contrato *</label>
+            <select id="tTipoContrato">
+              <option value="Indeterminado">Indeterminado</option>
+              <option value="Plazo fijo">Plazo fijo</option>
+              <option value="Por obra">Por obra</option>
+              <option value="Honorarios">Honorarios</option>
+            </select>
+          </div>
+          <div class="form-field"><label>Fecha de ingreso *</label><input type="date" id="tFechaIngreso"></div>
+          <div class="form-field"><label>Fecha de cese</label><input type="date" id="tFechaCese"></div>
+          <div class="form-field"><label>Estado</label>
+            <select id="tActivo"><option value="true">Activo</option><option value="false">Inactivo / Cesado</option></select>
+          </div>
+        </div>
+      </div>
+      <div id="tab-remuneracion" class="tab-content" style="display:none">
+        <div class="form-grid">
+          <div class="form-field"><label>Sueldo base (S/) *</label><input type="number" id="tSueldo" placeholder="2000.00" step="0.01"></div>
+          <div class="form-field"><label>Modalidad de pago</label>
+            <select id="tModalidadPago">
+              <option value="Mensual">Mensual</option>
+              <option value="Quincenal">Quincenal</option>
+              <option value="Por hora">Por hora</option>
+              <option value="Mixto">Mixto</option>
+            </select>
+          </div>
+          <div class="form-field"><label>Tarifa por hora (S/)</label><input type="number" id="tTarifaHora" placeholder="0.00" step="0.01"></div>
+          <div class="form-field"><label>Asignación familiar</label>
+            <select id="tAsigFam"><option value="false">No</option><option value="true">Sí (S/ 102.50)</option></select>
+          </div>
+          <div class="form-section">Sistema de pensiones</div>
+          <div class="form-field"><label>Régimen de pensión *</label>
+            <select id="tRegPension" onchange="toggleAFP(this.value)">
+              <option value="AFP">AFP</option>
+              <option value="SNP">SNP (ONP - 13%)</option>
+              <option value="Ninguno">Ninguno</option>
+            </select>
+          </div>
+          <div class="form-field" id="campoAfpNombre"><label>AFP</label>
+            <select id="tAfpNombre">
+              <option value="AFP Integra">AFP Integra</option>
+              <option value="AFP Prima">AFP Prima</option>
+              <option value="AFP Profuturo">AFP Profuturo</option>
+              <option value="AFP Habitat">AFP Habitat</option>
+            </select>
+          </div>
+          <div class="form-field" id="campoAfpComision"><label>Comisión AFP</label>
+            <select id="tAfpComision">
+              <option value="0.1069">Integra — 10.69%</option>
+              <option value="0.1075">Prima — 10.75%</option>
+              <option value="0.1074">Profuturo — 10.74%</option>
+              <option value="0.1069">Habitat — 10.69%</option>
+            </select>
+          </div>
+          <div class="form-section">Beneficios adicionales</div>
+          <div class="form-field"><label>Viático fijo mensual (S/)</label><input type="number" id="tViatico" placeholder="0.00" step="0.01"></div>
+          <div class="form-field"><label>Bono productividad (S/)</label><input id="tBono" placeholder="0.00" type="number" step="0.01"></div>
+          <div class="form-field"><label>Código EsSalud</label><input id="tEssalud" placeholder="Opcional"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="cerrarModal('modalTrab')">Cancelar</button>
+      <button class="btn btn-primary" id="btnGuardarTrab">Guardar trabajador</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL HORARIO ─────────────────────────────────────────── -->
+<div class="modal-overlay" id="modalHorario">
+  <div class="modal" style="width:480px">
+    <div class="modal-hdr">
+      <div class="modal-title" id="modalHorarioTitle">Nuevo horario</div>
+      <button class="modal-close" onclick="cerrarModal('modalHorario')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-field"><label>Código *</label><input id="hCodigo" placeholder="Oficina 3"></div>
+        <div class="form-field"><label>Nombre *</label><input id="hNombre" placeholder="Oficina turno 3"></div>
+        <div class="form-field full"><label>Días laborales</label><input id="hDias" placeholder="Lunes-Viernes"></div>
+        <div class="form-field"><label>Hora entrada</label><input type="time" id="hEntrada"></div>
+        <div class="form-field"><label>Hora salida</label><input type="time" id="hSalida"></div>
+        <div class="form-field"><label>Inicio refrigerio</label><input type="time" id="hRefIni"></div>
+        <div class="form-field"><label>Fin refrigerio</label><input type="time" id="hRefFin"></div>
+        <div class="form-field"><label>Duración refrigerio (min)</label><input type="number" id="hDurRef" value="60"></div>
+        <div class="form-field"><label>Tolerancia tardanza (min)</label><input type="number" id="hTolerancia" value="0"></div>
+        <div class="form-field"><label>Horas diarias</label><input type="number" id="hHorasDia" value="8" step="0.5"></div>
+        <div class="form-field"><label>¿Es nocturno?</label>
+          <select id="hNocturno"><option value="false">No</option><option value="true">Sí</option></select>
+        </div>
+        <div class="form-field"><label>¿Horario variable?</label>
+          <select id="hVariable"><option value="false">No (hora fija)</option><option value="true">Sí (campo)</option></select>
+        </div>
+        <div class="form-field"><label>¿Permite horas extra?</label>
+          <select id="hHorasExtra"><option value="true">Sí</option><option value="false">No</option></select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="cerrarModal('modalHorario')">Cancelar</button>
+      <button class="btn btn-primary" id="btnGuardarHorario">Guardar horario</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL ASIGNACIÓN ──────────────────────────────────────── -->
+<div class="modal-overlay" id="modalAsig">
+  <div class="modal" style="width:440px">
+    <div class="modal-hdr">
+      <div class="modal-title">Asignar horario</div>
+      <button class="modal-close" onclick="cerrarModal('modalAsig')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-field full"><label>Trabajador *</label>
+          <select id="aTrabajador"><option value="">— Seleccionar —</option></select>
+        </div>
+        <div class="form-field full"><label>Horario *</label>
+          <select id="aHorario"><option value="">— Seleccionar —</option></select>
+        </div>
+        <div class="form-field"><label>Fecha desde *</label><input type="date" id="aDesde"></div>
+        <div class="form-field"><label>Fecha hasta</label><input type="date" id="aHasta"></div>
+        <div class="form-field full"><label>Motivo del cambio</label><input id="aMotivo" placeholder="Ej: Cambio de turno por ruta norte"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="cerrarModal('modalAsig')">Cancelar</button>
+      <button class="btn btn-primary" id="btnGuardarAsig">Guardar asignación</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL PERMISO ─────────────────────────────────────────── -->
+<div class="modal-overlay" id="modalPermiso">
+  <div class="modal" style="width:480px">
+    <div class="modal-hdr">
+      <div class="modal-title" id="modalPermisoTitle">Nuevo permiso / vacación</div>
+      <button class="modal-close" onclick="cerrarModal('modalPermiso')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-field full"><label>Trabajador *</label>
+          <select id="pTrabajador"><option value="">— Seleccionar —</option></select>
+        </div>
+        <div class="form-field full"><label>Tipo de permiso *</label>
+          <select id="pTipo">
+            <option value="Vacaciones">Vacaciones</option>
+            <option value="Licencia médica">Licencia médica</option>
+            <option value="Licencia por maternidad">Licencia por maternidad</option>
+            <option value="Licencia por paternidad">Licencia por paternidad</option>
+            <option value="Permiso con goce">Permiso con goce</option>
+            <option value="Permiso sin goce">Permiso sin goce</option>
+            <option value="Comisión de servicio">Comisión de servicio</option>
+            <option value="Falta justificada">Falta justificada</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </div>
+        <div class="form-field"><label>Fecha inicio *</label><input type="date" id="pDesde"></div>
+        <div class="form-field"><label>Fecha fin *</label><input type="date" id="pHasta"></div>
+        <div class="form-field"><label>Con goce de haber</label>
+          <select id="pConGoce"><option value="true">Sí</option><option value="false">No</option></select>
+        </div>
+        <div class="form-field"><label>Estado</label>
+          <select id="pEstado">
+            <option value="Aprobado">Aprobado</option>
+            <option value="Pendiente">Pendiente</option>
+            <option value="Rechazado">Rechazado</option>
+          </select>
+        </div>
+        <div class="form-field full"><label>Observación</label>
+          <textarea id="pObservacion" placeholder="Motivo o detalle del permiso…"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="cerrarModal('modalPermiso')">Cancelar</button>
+      <button class="btn btn-primary" id="btnGuardarPermiso">Guardar permiso</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL FERIADO ─────────────────────────────────────────── -->
+<div class="modal-overlay" id="modalFeriado">
+  <div class="modal" style="width:400px">
+    <div class="modal-hdr">
+      <div class="modal-title">Nuevo feriado</div>
+      <button class="modal-close" onclick="cerrarModal('modalFeriado')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-field"><label>Fecha *</label><input type="date" id="fFecha"></div>
+        <div class="form-field"><label>Tipo</label>
+          <select id="fTipo"><option value="Nacional">Nacional</option><option value="Regional">Regional</option><option value="Empresa">Empresa</option></select>
+        </div>
+        <div class="form-field full"><label>Descripción *</label><input id="fDesc" placeholder="Ej: Día del Trabajo"></div>
+        <div class="form-field full"><label>Aplica a</label><input id="fAplica" value="Todos"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="cerrarModal('modalFeriado')">Cancelar</button>
+      <button class="btn btn-primary" id="btnGuardarFeriado">Guardar feriado</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL USUARIO PANEL ───────────────────────────────────── -->
+<div class="modal-overlay" id="modalUsuario">
+  <div class="modal" style="width:400px">
+    <div class="modal-hdr">
+      <div class="modal-title" id="modalUsuarioTitle">Nuevo usuario</div>
+      <button class="modal-close" onclick="cerrarModal('modalUsuario')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-field"><label>Usuario *</label><input id="uUsername" placeholder="jperez"></div>
+        <div class="form-field"><label>Contraseña *</label><input type="password" id="uPassword" placeholder="••••••••"></div>
+        <div class="form-field full"><label>Nombre completo *</label><input id="uNombre" placeholder="Juan Pérez"></div>
+        <div class="form-field"><label>Rol *</label>
+          <select id="uRol">
+            <option value="admin">Administrador</option>
+            <option value="jefe_area">Jefe de área</option>
+            <option value="consulta">Solo consulta</option>
+          </select>
+        </div>
+        <div class="form-field"><label>Área</label><input id="uArea" placeholder="RRHH"></div>
+        <div class="form-field"><label>Estado</label>
+          <select id="uActivo"><option value="true">Activo</option><option value="false">Inactivo</option></select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="cerrarModal('modalUsuario')">Cancelar</button>
+      <button class="btn btn-primary" id="btnGuardarUsuario">Guardar usuario</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── CONFIGURACIÓN ─────────────────────────────────────────────
+const SB_URL  = 'https://ajubapgkgadrthwcgjci.supabase.co';
+const SB_ANON = 'sb_publishable_9eetAavOoo7gVnzQu7vndA_CTuoywNK';
+const HEADERS = { 'apikey': SB_ANON, 'Authorization': 'Bearer ' + SB_ANON, 'Content-Type': 'application/json', 'Prefer': 'return=representation' };
+
+// ── Estado global ─────────────────────────────────────────────
+let currentUser = null;
+let editingId   = null;
+let allTrab     = [];
+let allHorarios = [];
+
+// ── API helpers ───────────────────────────────────────────────
+async function sbGet(table, params = '') {
+  const r = await fetch(`${SB_URL}/rest/v1/${table}?${params}`, { headers: HEADERS });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+async function sbPost(table, body) {
+  const r = await fetch(`${SB_URL}/rest/v1/${table}`, { method: 'POST', headers: HEADERS, body: JSON.stringify(body) });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+async function sbPatch(table, id, body) {
+  const r = await fetch(`${SB_URL}/rest/v1/${table}?id=eq.${id}`, { method: 'PATCH', headers: HEADERS, body: JSON.stringify(body) });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+async function sbDelete(table, id) {
+  const r = await fetch(`${SB_URL}/rest/v1/${table}?id=eq.${id}`, { method: 'DELETE', headers: HEADERS });
+  if (!r.ok) throw new Error(await r.text());
+}
+
+// ── Toast ─────────────────────────────────────────────────────
+function toast(msg, type = 'success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type} show`;
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+// ── SHA-256 para login ────────────────────────────────────────
+async function sha256(msg) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(msg));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+// ── Login ─────────────────────────────────────────────────────
+document.getElementById('btnLogin').addEventListener('click', async () => {
+  const user = document.getElementById('loginUser').value.trim();
+  const pass = document.getElementById('loginPass').value;
+  if (!user || !pass) return;
+  const btn = document.getElementById('btnLogin');
+  btn.innerHTML = '<span class="spinner"></span> Verificando…';
+  btn.disabled = true;
+  try {
+    const hash = await sha256(pass);
+    const res  = await sbGet('panel_usuarios', `username=eq.${encodeURIComponent(user)}&password_hash=eq.${hash}&activo=eq.true&select=*`);
+    if (!res.length) {
+      document.getElementById('loginError').style.display = 'block';
+    } else {
+      currentUser = res[0];
+      // Actualizar ultimo_acceso
+      await sbPatch('panel_usuarios', currentUser.id, { ultimo_acceso: new Date().toISOString() });
+      iniciarApp();
+    }
+  } catch(e) {
+    toast('Error de conexión: ' + e.message, 'error');
+  } finally {
+    btn.innerHTML = 'Ingresar →';
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('loginPass').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('btnLogin').click();
+});
+
+function iniciarApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').classList.add('visible');
+  const ini = currentUser.nombre.split(' ').map(w => w[0]).join('').slice(0,2);
+  document.getElementById('userAvatar').textContent = ini;
+  document.getElementById('userName').textContent   = currentUser.username;
+  const rb = document.getElementById('roleBadge');
+  rb.textContent = currentUser.rol.toUpperCase().replace('_',' ');
+  rb.className = 'role-badge role-' + (currentUser.rol === 'jefe_area' ? 'jefe' : currentUser.rol);
+  // Ocultar módulo usuarios si no es admin
+  if (currentUser.rol !== 'admin') {
+    document.querySelector('[data-page="usuarios"]').style.display = 'none';
+  }
+  cargarTrabajadores();
+  cargarHorarios();
+  verificarPermisosPendientes();
+}
+
+document.getElementById('btnLogout').addEventListener('click', () => {
+  currentUser = null;
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('app').classList.remove('visible');
+  document.getElementById('loginUser').value = '';
+  document.getElementById('loginPass').value = '';
+  document.getElementById('loginError').style.display = 'none';
+});
+
+// ── Navegación ────────────────────────────────────────────────
+document.querySelectorAll('.nav-item[data-page]').forEach(item => {
+  item.addEventListener('click', () => {
+    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+    item.classList.add('active');
+    const page = item.dataset.page;
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-' + page).classList.add('active');
+    document.getElementById('hdrModule').textContent = item.textContent.trim();
+    if (page === 'trabajadores')  cargarTrabajadores();
+    if (page === 'horarios')      cargarHorarios();
+    if (page === 'asignaciones')  cargarAsignaciones();
+    if (page === 'permisos')      cargarPermisos();
+    if (page === 'feriados')      cargarFeriados();
+    if (page === 'marcaciones')   cargarMarcaciones();
+    if (page === 'usuarios')      cargarUsuarios();
+  });
+});
+
+// ── Tabs en modal trabajador ──────────────────────────────────
+document.querySelectorAll('.modal-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+    document.getElementById('tab-' + tab.dataset.tab).style.display = 'block';
+  });
+});
+
+// ── Modal helpers ─────────────────────────────────────────────
+function abrirModal(id)  { document.getElementById(id).classList.add('open'); }
+function cerrarModal(id) { document.getElementById(id).classList.remove('open'); editingId = null; }
+document.querySelectorAll('.modal-overlay').forEach(o => {
+  o.addEventListener('click', e => { if (e.target === o) cerrarModal(o.id); });
+});
+
+// ── Formato fecha DD/MM/YYYY ──────────────────────────────────
+function fmtFecha(iso) {
+  if (!iso) return '—';
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+function fmtHora(t) { return t ? t.slice(0,5) : '—'; }
+function fmtMonto(n) { return n != null ? 'S/ ' + parseFloat(n).toFixed(2) : '—'; }
+
+// ── Badges helpers ────────────────────────────────────────────
+function badgeTipo(tipo) {
+  const m = { Administrativo:'badge-blue', Campo:'badge-amber', Mixto:'badge-teal' };
+  return `<span class="badge ${m[tipo]||'badge-gray'}">${tipo||'—'}</span>`;
+}
+function badgeEstado(activo) {
+  return activo ? '<span class="badge badge-green">Activo</span>' : '<span class="badge badge-red">Inactivo</span>';
+}
+function badgePension(reg) {
+  const m = { AFP:'badge-blue', SNP:'badge-amber', Ninguno:'badge-gray' };
+  return `<span class="badge ${m[reg]||'badge-gray'}">${reg||'—'}</span>`;
+}
+function badgePermiso(estado) {
+  const m = { Aprobado:'badge-green', Pendiente:'badge-amber', Rechazado:'badge-red', Anulado:'badge-gray' };
+  return `<span class="badge ${m[estado]||'badge-gray'}">${estado}</span>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  TRABAJADORES
+// ═══════════════════════════════════════════════════════════════
+async function cargarTrabajadores() {
+  try {
+    const data = await sbGet('trabajadores', 'select=*,asignacion_horarios(fecha_desde,fecha_hasta,horarios(nombre))&order=apellido_paterno.asc');
+    allTrab = data;
+    actualizarStats(data);
+    renderTrab(data);
+  } catch(e) { toast('Error cargando trabajadores: ' + e.message, 'error'); }
+}
+
+function actualizarStats(data) {
+  document.getElementById('statTotal').textContent    = data.length;
+  document.getElementById('statActivos').textContent  = data.filter(t => t.activo).length;
+  document.getElementById('statCampo').textContent    = data.filter(t => t.tipo_trabajador === 'Campo' && t.activo).length;
+  document.getElementById('statInactivos').textContent= data.filter(t => !t.activo).length;
+}
+
+function getHorarioVigente(trab) {
+  if (!trab.asignacion_horarios?.length) return '—';
+  const hoy  = new Date().toISOString().slice(0,10);
+  const vigs = trab.asignacion_horarios.filter(a =>
+    a.fecha_desde <= hoy && (!a.fecha_hasta || a.fecha_hasta >= hoy)
+  );
+  if (!vigs.length) return '—';
+  vigs.sort((a,b) => b.fecha_desde.localeCompare(a.fecha_desde));
+  return vigs[0].horarios?.nombre || '—';
+}
+
+function renderTrab(data) {
+  const q      = document.getElementById('searchTrab').value.toLowerCase();
+  const tipo   = document.getElementById('filtroTipo').value;
+  const estado = document.getElementById('filtroEstado').value;
+  const filtered = data.filter(t => {
+    const nombre = `${t.nombres} ${t.apellido_paterno} ${t.apellido_materno||''} ${t.dni} ${t.cargo}`.toLowerCase();
+    if (q && !nombre.includes(q)) return false;
+    if (tipo && t.tipo_trabajador !== tipo) return false;
+    if (estado !== '' && String(t.activo) !== estado) return false;
+    return true;
+  });
+
+  const tbody = document.getElementById('tbodyTrab');
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="empty-ico">🔍</div><p>No se encontraron trabajadores</p></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = filtered.map(t => `
+    <tr>
+      <td style="font-family:var(--mono);color:var(--muted)">${t.dni}</td>
+      <td><strong>${t.nombres} ${t.apellido_paterno}</strong><br><span style="font-size:11px;color:var(--muted)">${t.cargo||'—'}</span></td>
+      <td style="color:var(--muted);font-size:12px">${t.cargo||'—'}</td>
+      <td>${badgeTipo(t.tipo_trabajador)}</td>
+      <td style="font-size:12px">${getHorarioVigente(t)}</td>
+      <td style="font-family:var(--mono);font-size:12px">${fmtMonto(t.sueldo_base)}</td>
+      <td>${badgePension(t.regimen_pension)}</td>
+      <td>${badgeEstado(t.activo)}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-secondary btn-sm" onclick="editarTrab(${t.id})">Editar</button>
+        <button class="btn btn-danger btn-sm" onclick="toggleActivoTrab(${t.id}, ${t.activo})">${t.activo?'Dar baja':'Reactivar'}</button>
+      </td>
+    </tr>`).join('');
+}
+
+['searchTrab','filtroTipo','filtroEstado'].forEach(id => {
+  document.getElementById(id).addEventListener('input', () => renderTrab(allTrab));
+  document.getElementById(id).addEventListener('change', () => renderTrab(allTrab));
+});
+document.getElementById('btnRefreshTrab').addEventListener('click', cargarTrabajadores);
+
+// Nuevo trabajador
+document.getElementById('btnNuevoTrab').addEventListener('click', () => {
+  editingId = null;
+  document.getElementById('modalTrabTitle').textContent = 'Nuevo trabajador';
+  limpiarModalTrab();
+  document.getElementById('tFechaIngreso').value = new Date().toISOString().slice(0,10);
+  abrirModal('modalTrab');
+});
+
+function limpiarModalTrab() {
+  ['tDni','tBioId','tNombres','tApPat','tApMat','tTelefono','tEmail','tDireccion',
+   'tCargo','tArea','tSueldo','tTarifaHora','tViatico','tBono','tEssalud'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('tFechaNac').value   = '';
+  document.getElementById('tFechaCese').value  = '';
+  document.getElementById('tFechaIngreso').value = '';
+  document.getElementById('tSexo').value       = '';
+  document.getElementById('tTipoTrab').value   = 'Administrativo';
+  document.getElementById('tTipoContrato').value = 'Indeterminado';
+  document.getElementById('tActivo').value     = 'true';
+  document.getElementById('tModalidadPago').value = 'Mensual';
+  document.getElementById('tRegPension').value = 'AFP';
+  document.getElementById('tAfpNombre').value  = 'AFP Integra';
+  document.getElementById('tAfpComision').value = '0.1069';
+  document.getElementById('tAsigFam').value    = 'false';
+  toggleAFP('AFP');
+  // Volver al primer tab
+  document.querySelectorAll('.modal-tab').forEach((t,i) => { t.classList.toggle('active', i===0); });
+  document.querySelectorAll('.tab-content').forEach((c,i) => { c.style.display = i===0?'block':'none'; });
+}
+
+function toggleAFP(val) {
+  const show = val === 'AFP';
+  document.getElementById('campoAfpNombre').style.display    = show ? '' : 'none';
+  document.getElementById('campoAfpComision').style.display  = show ? '' : 'none';
+}
+document.getElementById('tRegPension').addEventListener('change', e => toggleAFP(e.target.value));
+
+// Editar trabajador
+function editarTrab(id) {
+  const t = allTrab.find(x => x.id === id);
+  if (!t) return;
+  editingId = id;
+  document.getElementById('modalTrabTitle').textContent = 'Editar trabajador';
+  document.getElementById('tDni').value          = t.dni || '';
+  document.getElementById('tBioId').value        = t.bio_id || '';
+  document.getElementById('tNombres').value      = t.nombres || '';
+  document.getElementById('tApPat').value        = t.apellido_paterno || '';
+  document.getElementById('tApMat').value        = t.apellido_materno || '';
+  document.getElementById('tFechaNac').value     = t.fecha_nacimiento || '';
+  document.getElementById('tSexo').value         = t.sexo || '';
+  document.getElementById('tTelefono').value     = t.telefono || '';
+  document.getElementById('tEmail').value        = t.email || '';
+  document.getElementById('tDireccion').value    = t.direccion || '';
+  document.getElementById('tCargo').value        = t.cargo || '';
+  document.getElementById('tArea').value         = t.area || '';
+  document.getElementById('tTipoTrab').value     = t.tipo_trabajador || 'Administrativo';
+  document.getElementById('tTipoContrato').value = t.tipo_contrato || 'Indeterminado';
+  document.getElementById('tFechaIngreso').value = t.fecha_ingreso || '';
+  document.getElementById('tFechaCese').value    = t.fecha_cese || '';
+  document.getElementById('tActivo').value       = String(t.activo);
+  document.getElementById('tSueldo').value       = t.sueldo_base || '';
+  document.getElementById('tModalidadPago').value= t.modalidad_pago || 'Mensual';
+  document.getElementById('tTarifaHora').value   = t.tarifa_hora || '';
+  document.getElementById('tAsigFam').value      = String(t.asignacion_familiar || false);
+  document.getElementById('tRegPension').value   = t.regimen_pension || 'AFP';
+  document.getElementById('tAfpNombre').value    = t.afp_nombre || 'AFP Integra';
+  document.getElementById('tAfpComision').value  = t.afp_comision || '0.1069';
+  document.getElementById('tViatico').value      = t.viatico_fijo || '';
+  document.getElementById('tBono').value         = t.bono_productividad || '';
+  document.getElementById('tEssalud').value      = t.codigo_essalud || '';
+  toggleAFP(t.regimen_pension || 'AFP');
+  // Volver al primer tab
+  document.querySelectorAll('.modal-tab').forEach((t,i) => { t.classList.toggle('active', i===0); });
+  document.querySelectorAll('.tab-content').forEach((c,i) => { c.style.display = i===0?'block':'none'; });
+  abrirModal('modalTrab');
+}
+
+// Guardar trabajador
+document.getElementById('btnGuardarTrab').addEventListener('click', async () => {
+  const dni = document.getElementById('tDni').value.trim();
+  if (!dni || !document.getElementById('tNombres').value.trim() || !document.getElementById('tApPat').value.trim()) {
+    toast('DNI, Nombres y Apellido paterno son obligatorios', 'error'); return;
+  }
+  const body = {
+    empresa_id:         1,
+    bio_id:             document.getElementById('tBioId').value.trim() || null,
+    dni,
+    nombres:            document.getElementById('tNombres').value.trim().toUpperCase(),
+    apellido_paterno:   document.getElementById('tApPat').value.trim().toUpperCase(),
+    apellido_materno:   document.getElementById('tApMat').value.trim().toUpperCase() || null,
+    fecha_nacimiento:   document.getElementById('tFechaNac').value || null,
+    sexo:               document.getElementById('tSexo').value || null,
+    telefono:           document.getElementById('tTelefono').value.trim() || null,
+    email:              document.getElementById('tEmail').value.trim() || null,
+    direccion:          document.getElementById('tDireccion').value.trim() || null,
+    cargo:              document.getElementById('tCargo').value.trim(),
+    area:               document.getElementById('tArea').value.trim() || null,
+    tipo_trabajador:    document.getElementById('tTipoTrab').value,
+    tipo_contrato:      document.getElementById('tTipoContrato').value,
+    fecha_ingreso:      document.getElementById('tFechaIngreso').value || null,
+    fecha_cese:         document.getElementById('tFechaCese').value || null,
+    activo:             document.getElementById('tActivo').value === 'true',
+    sueldo_base:        parseFloat(document.getElementById('tSueldo').value) || 0,
+    modalidad_pago:     document.getElementById('tModalidadPago').value,
+    tarifa_hora:        parseFloat(document.getElementById('tTarifaHora').value) || null,
+    asignacion_familiar:document.getElementById('tAsigFam').value === 'true',
+    regimen_pension:    document.getElementById('tRegPension').value,
+    afp_nombre:         document.getElementById('tRegPension').value === 'AFP' ? document.getElementById('tAfpNombre').value : null,
+    afp_comision:       document.getElementById('tRegPension').value === 'AFP' ? parseFloat(document.getElementById('tAfpComision').value) : null,
+    afp_prima_seguro:   document.getElementById('tRegPension').value === 'AFP' ? 0.0184 : null,
+    viatico_fijo:       parseFloat(document.getElementById('tViatico').value) || 0,
+    bono_productividad: parseFloat(document.getElementById('tBono').value) || 0,
+    codigo_essalud:     document.getElementById('tEssalud').value.trim() || null,
+  };
+  const btn = document.getElementById('btnGuardarTrab');
+  btn.innerHTML = '<span class="spinner"></span> Guardando…';
+  btn.disabled  = true;
+  try {
+    if (editingId) {
+      await sbPatch('trabajadores', editingId, body);
+      toast('Trabajador actualizado correctamente');
+    } else {
+      await sbPost('trabajadores', body);
+      toast('Trabajador registrado correctamente');
+    }
+    cerrarModal('modalTrab');
+    cargarTrabajadores();
+  } catch(e) {
+    const msg = e.message.includes('unique') ? 'El DNI ya está registrado' : e.message;
+    toast('Error: ' + msg, 'error');
+  } finally {
+    btn.innerHTML = 'Guardar trabajador';
+    btn.disabled  = false;
+  }
+});
+
+async function toggleActivoTrab(id, activo) {
+  const accion = activo ? 'dar de baja' : 'reactivar';
+  if (!confirm(`¿Desea ${accion} a este trabajador?`)) return;
+  try {
+    const body = activo ? { activo: false, fecha_cese: new Date().toISOString().slice(0,10) } : { activo: true, fecha_cese: null };
+    await sbPatch('trabajadores', id, body);
+    toast(`Trabajador ${activo ? 'dado de baja' : 'reactivado'} correctamente`);
+    cargarTrabajadores();
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  HORARIOS
+// ═══════════════════════════════════════════════════════════════
+async function cargarHorarios() {
+  try {
+    const data = await sbGet('horarios', 'select=*&order=codigo.asc');
+    allHorarios = data;
+    const tbody = document.getElementById('tbodyHorarios');
+    tbody.innerHTML = data.map(h => `
+      <tr>
+        <td style="font-family:var(--mono);color:var(--accent)">${h.codigo}</td>
+        <td><strong>${h.nombre}</strong></td>
+        <td style="font-size:12px;color:var(--muted)">${h.dias_laborales||'—'}</td>
+        <td style="font-family:var(--mono);font-size:12px">${fmtHora(h.hora_entrada)}</td>
+        <td style="font-family:var(--mono);font-size:12px">${fmtHora(h.hora_salida)}</td>
+        <td style="font-size:12px;color:var(--muted)">${fmtHora(h.hora_ref_ini)} - ${fmtHora(h.hora_ref_fin)}</td>
+        <td style="font-family:var(--mono);font-size:12px">${h.tolerancia_min} min</td>
+        <td>${h.es_variable ? '<span class="badge badge-amber">Variable</span>' : h.es_nocturno ? '<span class="badge badge-blue">Nocturno</span>' : '<span class="badge badge-teal">Fijo</span>'}</td>
+        <td><button class="btn btn-secondary btn-sm" onclick="editarHorario(${h.id})">Editar</button></td>
+      </tr>`).join('');
+    // Llenar selects de asignaciones y permisos
+    poblarSelectTrab();
+    poblarSelectHorarios();
+  } catch(e) { toast('Error cargando horarios: ' + e.message, 'error'); }
+}
+
+function poblarSelectTrab() {
+  const opts = '<option value="">— Seleccionar —</option>' +
+    allTrab.filter(t => t.activo).map(t => `<option value="${t.id}">${t.nombres} ${t.apellido_paterno} (${t.dni})</option>`).join('');
+  ['aTrabajador','pTrabajador'].forEach(id => { document.getElementById(id).innerHTML = opts; });
+}
+function poblarSelectHorarios() {
+  const opts = '<option value="">— Seleccionar —</option>' +
+    allHorarios.map(h => `<option value="${h.id}">${h.codigo} — ${h.nombre}</option>`).join('');
+  document.getElementById('aHorario').innerHTML = opts;
+}
+
+document.getElementById('btnNuevoHorario').addEventListener('click', () => {
+  editingId = null;
+  document.getElementById('modalHorarioTitle').textContent = 'Nuevo horario';
+  ['hCodigo','hNombre','hDias','hEntrada','hSalida','hRefIni','hRefFin'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('hDurRef').value      = '60';
+  document.getElementById('hTolerancia').value  = '0';
+  document.getElementById('hHorasDia').value    = '8';
+  document.getElementById('hNocturno').value     = 'false';
+  document.getElementById('hVariable').value    = 'false';
+  document.getElementById('hHorasExtra').value  = 'true';
+  abrirModal('modalHorario');
+});
+
+function editarHorario(id) {
+  const h = allHorarios.find(x => x.id === id);
+  if (!h) return;
+  editingId = id;
+  document.getElementById('modalHorarioTitle').textContent = 'Editar horario';
+  document.getElementById('hCodigo').value      = h.codigo || '';
+  document.getElementById('hNombre').value      = h.nombre || '';
+  document.getElementById('hDias').value        = h.dias_laborales || '';
+  document.getElementById('hEntrada').value     = h.hora_entrada || '';
+  document.getElementById('hSalida').value      = h.hora_salida || '';
+  document.getElementById('hRefIni').value      = h.hora_ref_ini || '';
+  document.getElementById('hRefFin').value      = h.hora_ref_fin || '';
+  document.getElementById('hDurRef').value      = h.duracion_ref_min || 60;
+  document.getElementById('hTolerancia').value  = h.tolerancia_min || 0;
+  document.getElementById('hHorasDia').value    = h.horas_diarias || 8;
+  document.getElementById('hNocturno').value    = String(h.es_nocturno);
+  document.getElementById('hVariable').value   = String(h.es_variable);
+  document.getElementById('hHorasExtra').value = String(h.permite_horas_extra);
+  abrirModal('modalHorario');
+}
+
+document.getElementById('btnGuardarHorario').addEventListener('click', async () => {
+  const codigo = document.getElementById('hCodigo').value.trim();
+  if (!codigo || !document.getElementById('hNombre').value.trim()) {
+    toast('Código y nombre son obligatorios', 'error'); return;
+  }
+  const body = {
+    codigo,
+    nombre:           document.getElementById('hNombre').value.trim(),
+    dias_laborales:   document.getElementById('hDias').value.trim() || null,
+    hora_entrada:     document.getElementById('hEntrada').value || null,
+    hora_salida:      document.getElementById('hSalida').value || null,
+    hora_ref_ini:     document.getElementById('hRefIni').value || null,
+    hora_ref_fin:     document.getElementById('hRefFin').value || null,
+    duracion_ref_min: parseInt(document.getElementById('hDurRef').value) || 60,
+    tolerancia_min:   parseInt(document.getElementById('hTolerancia').value) || 0,
+    horas_diarias:    parseFloat(document.getElementById('hHorasDia').value) || 8,
+    es_nocturno:      document.getElementById('hNocturno').value === 'true',
+    es_variable:      document.getElementById('hVariable').value === 'true',
+    permite_horas_extra: document.getElementById('hHorasExtra').value === 'true',
+    activo:           true,
+  };
+  const btn = document.getElementById('btnGuardarHorario');
+  btn.innerHTML = '<span class="spinner"></span>';
+  btn.disabled  = true;
+  try {
+    if (editingId) { await sbPatch('horarios', editingId, body); toast('Horario actualizado'); }
+    else           { await sbPost('horarios', body); toast('Horario creado'); }
+    cerrarModal('modalHorario');
+    cargarHorarios();
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+  finally { btn.innerHTML = 'Guardar horario'; btn.disabled = false; }
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  ASIGNACIONES
+// ═══════════════════════════════════════════════════════════════
+async function cargarAsignaciones() {
+  try {
+    const data = await sbGet('asignacion_horarios',
+      'select=*,trabajadores(nombres,apellido_paterno,dni),horarios(codigo,nombre)&order=fecha_desde.desc');
+    const tbody = document.getElementById('tbodyAsig');
+    tbody.innerHTML = data.map(a => `
+      <tr>
+        <td><strong>${a.trabajadores?.nombres} ${a.trabajadores?.apellido_paterno}</strong><br><span style="font-size:11px;color:var(--muted)">${a.trabajadores?.dni}</span></td>
+        <td><span class="badge badge-teal">${a.horarios?.codigo}</span> ${a.horarios?.nombre}</td>
+        <td style="font-family:var(--mono);font-size:12px">${fmtFecha(a.fecha_desde)}</td>
+        <td style="font-family:var(--mono);font-size:12px">${a.fecha_hasta ? fmtFecha(a.fecha_hasta) : '<span style="color:var(--muted)">Vigente</span>'}</td>
+        <td style="font-size:12px;color:var(--muted)">${a.motivo_cambio||'—'}</td>
+        <td><button class="btn btn-danger btn-sm" onclick="eliminarAsig(${a.id})">Eliminar</button></td>
+      </tr>`).join('');
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+
+document.getElementById('btnNuevaAsig').addEventListener('click', () => {
+  poblarSelectTrab(); poblarSelectHorarios();
+  ['aDesde','aHasta','aMotivo'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('aDesde').value = new Date().toISOString().slice(0,10);
+  abrirModal('modalAsig');
+});
+
+document.getElementById('btnGuardarAsig').addEventListener('click', async () => {
+  const tid = document.getElementById('aTrabajador').value;
+  const hid = document.getElementById('aHorario').value;
+  const des = document.getElementById('aDesde').value;
+  if (!tid || !hid || !des) { toast('Trabajador, horario y fecha son obligatorios', 'error'); return; }
+  const btn = document.getElementById('btnGuardarAsig');
+  btn.innerHTML = '<span class="spinner"></span>'; btn.disabled = true;
+  try {
+    await sbPost('asignacion_horarios', {
+      trabajador_id: parseInt(tid), horario_id: parseInt(hid),
+      fecha_desde: des, fecha_hasta: document.getElementById('aHasta').value || null,
+      motivo_cambio: document.getElementById('aMotivo').value.trim() || null,
+    });
+    toast('Asignación guardada');
+    cerrarModal('modalAsig');
+    cargarAsignaciones();
+  } catch(e) {
+    const msg = e.message.includes('unique') ? 'Ya existe una asignación con esa fecha de inicio para este trabajador' : e.message;
+    toast('Error: ' + msg, 'error');
+  } finally { btn.innerHTML = 'Guardar asignación'; btn.disabled = false; }
+});
+
+async function eliminarAsig(id) {
+  if (!confirm('¿Eliminar esta asignación de horario?')) return;
+  try { await sbDelete('asignacion_horarios', id); toast('Asignación eliminada'); cargarAsignaciones(); }
+  catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  PERMISOS
+// ═══════════════════════════════════════════════════════════════
+async function cargarPermisos() {
+  try {
+    const estado = document.getElementById('filtroEstadoPerm').value;
+    let params = 'select=*,trabajadores(nombres,apellido_paterno,dni)&order=creado_en.desc';
+    if (estado) params += `&estado=eq.${estado}`;
+    const data = await sbGet('permisos', params);
+    const tbody = document.getElementById('tbodyPermisos');
+    tbody.innerHTML = data.map(p => `
+      <tr>
+        <td><strong>${p.trabajadores?.nombres} ${p.trabajadores?.apellido_paterno}</strong><br><span style="font-size:11px;color:var(--muted)">${p.trabajadores?.dni}</span></td>
+        <td style="font-size:12px">${p.tipo}</td>
+        <td style="font-family:var(--mono);font-size:12px">${fmtFecha(p.fecha_desde)}</td>
+        <td style="font-family:var(--mono);font-size:12px">${fmtFecha(p.fecha_hasta)}</td>
+        <td style="font-family:var(--mono);text-align:center">${p.dias_habiles||'—'}</td>
+        <td>${p.con_goce ? '<span class="badge badge-green">Con goce</span>' : '<span class="badge badge-amber">Sin goce</span>'}</td>
+        <td>${badgePermiso(p.estado)}</td>
+        <td style="white-space:nowrap">
+          ${p.estado === 'Pendiente' ? `<button class="btn btn-primary btn-sm" onclick="aprobarPermiso(${p.id})">Aprobar</button> <button class="btn btn-danger btn-sm" onclick="rechazarPermiso(${p.id})">Rechazar</button>` : `<button class="btn btn-secondary btn-sm" onclick="editarPermiso(${p.id})">Editar</button>`}
+        </td>
+      </tr>`).join('') || `<tr><td colspan="8"><div class="empty-state"><div class="empty-ico">📝</div><p>No hay permisos</p></div></td></tr>`;
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+
+async function verificarPermisosPendientes() {
+  try {
+    const data = await sbGet('permisos', 'select=id&estado=eq.Pendiente');
+    const badge = document.getElementById('badgePermisos');
+    if (data.length > 0) { badge.textContent = data.length; badge.classList.add('visible'); }
+    else badge.classList.remove('visible');
+  } catch(e) {}
+}
+
+document.getElementById('filtroEstadoPerm').addEventListener('change', cargarPermisos);
+document.getElementById('btnRefreshPermisos').addEventListener('click', cargarPermisos);
+
+document.getElementById('btnNuevoPermiso').addEventListener('click', () => {
+  editingId = null;
+  document.getElementById('modalPermisoTitle').textContent = 'Nuevo permiso / vacación';
+  poblarSelectTrab();
+  document.getElementById('pTrabajador').value = '';
+  document.getElementById('pTipo').value        = 'Vacaciones';
+  document.getElementById('pDesde').value       = '';
+  document.getElementById('pHasta').value       = '';
+  document.getElementById('pConGoce').value     = 'true';
+  document.getElementById('pEstado').value      = 'Aprobado';
+  document.getElementById('pObservacion').value = '';
+  abrirModal('modalPermiso');
+});
+
+function editarPermiso(id) { toast('Función de edición en desarrollo', 'error'); }
+
+async function aprobarPermiso(id) {
+  try { await sbPatch('permisos', id, { estado: 'Aprobado', aprobado_por: currentUser.nombre }); toast('Permiso aprobado'); cargarPermisos(); verificarPermisosPendientes(); }
+  catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+async function rechazarPermiso(id) {
+  if (!confirm('¿Rechazar este permiso?')) return;
+  try { await sbPatch('permisos', id, { estado: 'Rechazado' }); toast('Permiso rechazado'); cargarPermisos(); verificarPermisosPendientes(); }
+  catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+
+document.getElementById('btnGuardarPermiso').addEventListener('click', async () => {
+  const tid = document.getElementById('pTrabajador').value;
+  const des = document.getElementById('pDesde').value;
+  const has = document.getElementById('pHasta').value;
+  if (!tid || !des || !has) { toast('Trabajador y fechas son obligatorios', 'error'); return; }
+  const btn = document.getElementById('btnGuardarPermiso');
+  btn.innerHTML = '<span class="spinner"></span>'; btn.disabled = true;
+  try {
+    await sbPost('permisos', {
+      trabajador_id: parseInt(tid),
+      tipo:          document.getElementById('pTipo').value,
+      fecha_desde:   des, fecha_hasta: has,
+      con_goce:      document.getElementById('pConGoce').value === 'true',
+      estado:        document.getElementById('pEstado').value,
+      observacion:   document.getElementById('pObservacion').value.trim() || null,
+      aprobado_por:  currentUser.nombre,
+    });
+    toast('Permiso registrado');
+    cerrarModal('modalPermiso');
+    cargarPermisos();
+    verificarPermisosPendientes();
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+  finally { btn.innerHTML = 'Guardar permiso'; btn.disabled = false; }
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  FERIADOS
+// ═══════════════════════════════════════════════════════════════
+async function cargarFeriados() {
+  try {
+    const data = await sbGet('feriados', 'select=*&order=fecha.asc');
+    const tbody = document.getElementById('tbodyFeriados');
+    tbody.innerHTML = data.map(f => `
+      <tr>
+        <td style="font-family:var(--mono)">${fmtFecha(f.fecha)}</td>
+        <td>${f.descripcion}</td>
+        <td><span class="badge ${f.tipo==='Nacional'?'badge-blue':f.tipo==='Regional'?'badge-amber':'badge-teal'}">${f.tipo}</span></td>
+        <td style="font-size:12px;color:var(--muted)">${f.aplica_a}</td>
+        <td><button class="btn btn-danger btn-sm" onclick="eliminarFeriado(${f.id})">Eliminar</button></td>
+      </tr>`).join('');
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+
+document.getElementById('btnNuevoFeriado').addEventListener('click', () => {
+  ['fFecha','fDesc'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('fTipo').value   = 'Nacional';
+  document.getElementById('fAplica').value = 'Todos';
+  abrirModal('modalFeriado');
+});
+
+document.getElementById('btnGuardarFeriado').addEventListener('click', async () => {
+  const fecha = document.getElementById('fFecha').value;
+  const desc  = document.getElementById('fDesc').value.trim();
+  if (!fecha || !desc) { toast('Fecha y descripción son obligatorios', 'error'); return; }
+  const btn = document.getElementById('btnGuardarFeriado');
+  btn.innerHTML = '<span class="spinner"></span>'; btn.disabled = true;
+  try {
+    await sbPost('feriados', {
+      empresa_id:  null,
+      fecha, descripcion: desc,
+      tipo:        document.getElementById('fTipo').value,
+      aplica_a:    document.getElementById('fAplica').value || 'Todos',
+    });
+    toast('Feriado registrado');
+    cerrarModal('modalFeriado');
+    cargarFeriados();
+  } catch(e) {
+    const msg = e.message.includes('unique') ? 'Ya existe un feriado en esa fecha' : e.message;
+    toast('Error: ' + msg, 'error');
+  } finally { btn.innerHTML = 'Guardar feriado'; btn.disabled = false; }
+});
+
+async function eliminarFeriado(id) {
+  if (!confirm('¿Eliminar este feriado?')) return;
+  try { await sbDelete('feriados', id); toast('Feriado eliminado'); cargarFeriados(); }
+  catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  MARCACIONES
+// ═══════════════════════════════════════════════════════════════
+async function cargarMarcaciones() {
+  const fecha = document.getElementById('filtroFechaMarca').value;
+  const q     = document.getElementById('searchMarca').value.trim();
+  if (!fecha && !q) return;
+  try {
+    let params = 'select=*,trabajadores(nombres,apellido_paterno)&order=hora.asc&estado=eq.Activo';
+    if (fecha) params += `&fecha=eq.${fecha}`;
+    if (q)     params += `&dni=ilike.*${q}*`;
+    const data = await sbGet('marcaciones', params);
+    const tbody = document.getElementById('tbodyMarca');
+    tbody.innerHTML = data.map(m => `
+      <tr>
+        <td style="font-family:var(--mono);color:var(--muted)">${m.dni}</td>
+        <td>${m.trabajadores ? `${m.trabajadores.nombres} ${m.trabajadores.apellido_paterno}` : '<span style="color:var(--muted)">—</span>'}</td>
+        <td style="font-family:var(--mono);font-size:12px">${fmtFecha(m.fecha)}</td>
+        <td style="font-family:var(--mono)">${fmtHora(m.hora)}</td>
+        <td>${m.tipo === 'Entrada' ? '<span class="badge badge-green">Entrada</span>' : '<span class="badge badge-blue">Salida</span>'}</td>
+        <td><span class="badge ${m.fuente==='Biometrico'?'badge-amber':'badge-teal'}">${m.fuente}</span></td>
+        <td style="font-size:12px">${m.ubicacion||'—'}</td>
+        <td><span class="badge badge-green">Activo</span></td>
+        <td><button class="btn btn-danger btn-sm" onclick="anularMarcacion(${m.id})">Anular</button></td>
+      </tr>`).join('') || `<tr><td colspan="9"><div class="empty-state"><div class="empty-ico">📍</div><p>No hay marcaciones para este filtro</p></div></td></tr>`;
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+
+document.getElementById('filtroFechaMarca').addEventListener('change', cargarMarcaciones);
+document.getElementById('searchMarca').addEventListener('input', () => {
+  if (document.getElementById('searchMarca').value.length >= 3 || document.getElementById('filtroFechaMarca').value) cargarMarcaciones();
+});
+document.getElementById('btnRefreshMarca').addEventListener('click', cargarMarcaciones);
+
+async function anularMarcacion(id) {
+  const motivo = prompt('Motivo de anulación:');
+  if (motivo === null) return;
+  try {
+    await sbPatch('marcaciones', id, { estado: 'Anulado', motivo_anulacion: motivo, anulado_por: currentUser.nombre, anulado_en: new Date().toISOString() });
+    toast('Marcación anulada. El período laboral se recalculará.');
+    cargarMarcaciones();
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  REPORTES
+// ═══════════════════════════════════════════════════════════════
+document.getElementById('filtroMesReporte').value = new Date().toISOString().slice(0,7);
+
+document.getElementById('btnCargarReporte').addEventListener('click', async () => {
+  const mes = document.getElementById('filtroMesReporte').value;
+  if (!mes) { toast('Seleccione un mes', 'error'); return; }
+  const btn = document.getElementById('btnCargarReporte');
+  btn.innerHTML = '<span class="spinner"></span> Cargando…'; btn.disabled = true;
+  try {
+    const data = await sbGet('v_resumen_asistencia_mensual',
+      `mes=eq.${mes}-01&order=nombre_completo.asc&select=*`);
+    const tbody = document.getElementById('tbodyReporte');
+    tbody.innerHTML = data.map(r => `
+      <tr>
+        <td><strong>${r.nombre_completo}</strong><br><span style="font-size:11px;color:var(--muted)">${r.cargo}</span></td>
+        <td>${badgeTipo(r.tipo_trabajador)}</td>
+        <td style="font-family:var(--mono);text-align:center">${r.dias_asistidos||0}</td>
+        <td style="font-family:var(--mono);text-align:center;color:var(--warn)">${r.dias_tardanza||0}</td>
+        <td style="font-family:var(--mono);text-align:center;color:var(--danger)">${r.dias_falta||0}</td>
+        <td style="font-family:var(--mono)">${r.total_horas_trabajadas||'0.00'} h</td>
+        <td style="font-family:var(--mono);color:var(--success)">${r.total_min_horas_extra ? Math.round(r.total_min_horas_extra/60*100)/100 + ' h' : '—'}</td>
+        <td style="font-family:var(--mono);text-align:center">${(r.dias_permiso_goce||0)+(r.dias_vacaciones||0)}</td>
+      </tr>`).join('') || `<tr><td colspan="8"><div class="empty-state"><div class="empty-ico">📊</div><p>No hay datos para este período</p></div></td></tr>`;
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+  finally { btn.innerHTML = 'Cargar reporte'; btn.disabled = false; }
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  USUARIOS DEL PANEL
+// ═══════════════════════════════════════════════════════════════
+async function cargarUsuarios() {
+  try {
+    const data = await sbGet('panel_usuarios', 'select=*&order=nombre.asc');
+    const tbody = document.getElementById('tbodyUsuarios');
+    tbody.innerHTML = data.map(u => `
+      <tr>
+        <td style="font-family:var(--mono)">${u.username}</td>
+        <td>${u.nombre}</td>
+        <td><span class="role-badge ${u.rol==='admin'?'role-admin':u.rol==='jefe_area'?'role-jefe':'role-consulta'}">${u.rol.toUpperCase().replace('_',' ')}</span></td>
+        <td style="font-size:12px;color:var(--muted)">${u.area||'—'}</td>
+        <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${u.ultimo_acceso ? new Date(u.ultimo_acceso).toLocaleString('es-PE') : '—'}</td>
+        <td>${u.activo ? '<span class="badge badge-green">Activo</span>' : '<span class="badge badge-red">Inactivo</span>'}</td>
+        <td>${u.id !== currentUser.id ? `<button class="btn btn-danger btn-sm" onclick="toggleUsuario(${u.id}, ${u.activo})">${u.activo?'Desactivar':'Activar'}</button>` : '<span style="font-size:11px;color:var(--muted)">Tú</span>'}</td>
+      </tr>`).join('');
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+
+document.getElementById('btnNuevoUsuario').addEventListener('click', () => {
+  editingId = null;
+  document.getElementById('modalUsuarioTitle').textContent = 'Nuevo usuario';
+  ['uUsername','uPassword','uNombre','uArea'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('uRol').value    = 'consulta';
+  document.getElementById('uActivo').value = 'true';
+  abrirModal('modalUsuario');
+});
+
+document.getElementById('btnGuardarUsuario').addEventListener('click', async () => {
+  const username = document.getElementById('uUsername').value.trim();
+  const password = document.getElementById('uPassword').value;
+  const nombre   = document.getElementById('uNombre').value.trim();
+  if (!username || !password || !nombre) { toast('Usuario, contraseña y nombre son obligatorios', 'error'); return; }
+  const btn = document.getElementById('btnGuardarUsuario');
+  btn.innerHTML = '<span class="spinner"></span>'; btn.disabled = true;
+  try {
+    const hash = await sha256(password);
+    await sbPost('panel_usuarios', {
+      empresa_id:    1,
+      username, nombre,
+      password_hash: hash,
+      rol:           document.getElementById('uRol').value,
+      area:          document.getElementById('uArea').value.trim() || null,
+      activo:        document.getElementById('uActivo').value === 'true',
+    });
+    toast('Usuario creado correctamente');
+    cerrarModal('modalUsuario');
+    cargarUsuarios();
+  } catch(e) {
+    const msg = e.message.includes('unique') ? 'El nombre de usuario ya existe' : e.message;
+    toast('Error: ' + msg, 'error');
+  } finally { btn.innerHTML = 'Guardar usuario'; btn.disabled = false; }
+});
+
+async function toggleUsuario(id, activo) {
+  try { await sbPatch('panel_usuarios', id, { activo: !activo }); toast(`Usuario ${activo?'desactivado':'activado'}`); cargarUsuarios(); }
+  catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+</script>
+</body>
+</html>
