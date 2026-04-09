@@ -166,6 +166,29 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   .form-grid{grid-template-columns:1fr}
   .modal{width:95vw}
 }
+/* Control de acceso por rol */
+body.rol-consulta .btn-primary,
+body.rol-consulta .btn-danger,
+body.rol-consulta #btnNuevoTrab,
+body.rol-consulta #btnNuevoHorario,
+body.rol-consulta #btnNuevaAsig,
+body.rol-consulta #btnNuevoPermiso,
+body.rol-consulta #btnNuevoFeriado,
+body.rol-consulta #btnNuevoUsuario,
+body.rol-consulta #btnExtraerBio,
+body.rol-consulta .nav-item[data-page="usuarios"] {
+  display: none !important;
+}
+body.rol-consulta .modal-overlay { display: none !important; }
+body.rol-jefe #btnNuevoTrab,
+body.rol-jefe #btnNuevoHorario,
+body.rol-jefe #btnNuevoAsig,
+body.rol-jefe #btnNuevoFeriado,
+body.rol-jefe #btnNuevoUsuario,
+body.rol-jefe #btnExtraerBio,
+body.rol-jefe .nav-item[data-page="usuarios"] {
+  display: none !important;
+}
 </style>
 </head>
 <body>
@@ -175,7 +198,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   <div class="login-box">
     <div class="login-logo">▸ TELNET SP</div>
     <div class="login-title">Panel de Administración</div>
-    <div class="login-sub">Acceso restringido a personal no autorizado</div>
+    <div class="login-sub">Acceso restringido a personal autorizado</div>
     <div class="field">
       <label>Usuario</label>
       <input type="text" id="loginUser" placeholder="usuario" autocomplete="off">
@@ -289,6 +312,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
                 <th>Horario vigente</th>
                 <th>Sueldo</th>
                 <th>Pensión</th>
+                <th>PIN</th>
                 <th>Estado</th>
                 <th></th>
               </tr>
@@ -468,6 +492,8 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <div class="form-grid">
           <div class="form-field"><label>DNI *</label><input id="tDni" placeholder="12345678" maxlength="12"></div>
           <div class="form-field"><label>ID Biométrico</label><input id="tBioId" placeholder="BIO001"></div>
+          <div class="form-field"><label>PIN de acceso app</label><input id="tPin" placeholder="4 a 6 dígitos" maxlength="6" inputmode="numeric" type="password" autocomplete="off"></div>
+          <div class="form-field"><label>Teléfono celular</label><input id="tCelular" placeholder="999 888 777"></div>
           <div class="form-field"><label>Nombres *</label><input id="tNombres" placeholder="Juan Carlos"></div>
           <div class="form-field"><label>Apellido paterno *</label><input id="tApPat" placeholder="García"></div>
           <div class="form-field"><label>Apellido materno</label><input id="tApMat" placeholder="López"></div>
@@ -818,10 +844,20 @@ function iniciarApp() {
   const rb = document.getElementById('roleBadge');
   rb.textContent = currentUser.rol.toUpperCase().replace('_',' ');
   rb.className = 'role-badge role-' + (currentUser.rol === 'jefe_area' ? 'jefe' : currentUser.rol);
-  // Ocultar módulo usuarios si no es admin
-  if (currentUser.rol !== 'admin') {
-    document.querySelector('[data-page="usuarios"]').style.display = 'none';
+
+  // Aplicar clase de rol al body para control de acceso via CSS
+  document.body.classList.remove('rol-admin','rol-jefe','rol-consulta');
+  if (currentUser.rol === 'admin')      document.body.classList.add('rol-admin');
+  if (currentUser.rol === 'jefe_area')  document.body.classList.add('rol-jefe');
+  if (currentUser.rol === 'consulta')   document.body.classList.add('rol-consulta');
+
+  // Bloquear apertura de modales para rol consulta
+  if (currentUser.rol === 'consulta') {
+    document.querySelectorAll('.modal-overlay').forEach(m => {
+      m.addEventListener('click', e => e.stopPropagation());
+    });
   }
+
   cargarTrabajadores();
   cargarHorarios();
   verificarPermisosPendientes();
@@ -954,6 +990,7 @@ function renderTrab(data) {
       <td style="font-size:12px">${getHorarioVigente(t)}</td>
       <td style="font-family:var(--mono);font-size:12px">${fmtMonto(t.sueldo_base)}</td>
       <td>${badgePension(t.regimen_pension)}</td>
+      <td style="font-family:var(--mono);font-size:12px">${t.pin ? '••••' : '<span style="color:var(--danger);font-size:11px">Sin PIN</span>'}</td>
       <td>${badgeEstado(t.activo)}</td>
       <td style="white-space:nowrap">
         <button class="btn btn-secondary btn-sm" onclick="editarTrab(${t.id})">Editar</button>
@@ -978,7 +1015,7 @@ document.getElementById('btnNuevoTrab').addEventListener('click', () => {
 });
 
 function limpiarModalTrab() {
-  ['tDni','tBioId','tNombres','tApPat','tApMat','tTelefono','tEmail','tDireccion',
+  ['tDni','tBioId','tPin','tCelular','tNombres','tApPat','tApMat','tTelefono','tEmail','tDireccion',
    'tCargo','tArea','tSueldo','tTarifaHora','tViatico','tBono','tEssalud'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
@@ -1016,6 +1053,8 @@ function editarTrab(id) {
   document.getElementById('modalTrabTitle').textContent = 'Editar trabajador';
   document.getElementById('tDni').value          = t.dni || '';
   document.getElementById('tBioId').value        = t.bio_id || '';
+  document.getElementById('tPin').value          = t.pin || '';
+  document.getElementById('tCelular').value      = t.telefono || '';
   document.getElementById('tNombres').value      = t.nombres || '';
   document.getElementById('tApPat').value        = t.apellido_paterno || '';
   document.getElementById('tApMat').value        = t.apellido_materno || '';
@@ -1050,6 +1089,7 @@ function editarTrab(id) {
 
 // Guardar trabajador
 document.getElementById('btnGuardarTrab').addEventListener('click', async () => {
+  if (currentUser?.rol === 'consulta') { toast('Sin permisos para esta acción', 'error'); return; }
   const dni = document.getElementById('tDni').value.trim();
   if (!dni || !document.getElementById('tNombres').value.trim() || !document.getElementById('tApPat').value.trim()) {
     toast('DNI, Nombres y Apellido paterno son obligatorios', 'error'); return;
@@ -1057,13 +1097,14 @@ document.getElementById('btnGuardarTrab').addEventListener('click', async () => 
   const body = {
     empresa_id:         1,
     bio_id:             document.getElementById('tBioId').value.trim() || null,
+    pin:                document.getElementById('tPin').value.trim() || null,
     dni,
     nombres:            document.getElementById('tNombres').value.trim().toUpperCase(),
     apellido_paterno:   document.getElementById('tApPat').value.trim().toUpperCase(),
     apellido_materno:   document.getElementById('tApMat').value.trim().toUpperCase() || null,
     fecha_nacimiento:   document.getElementById('tFechaNac').value || null,
     sexo:               document.getElementById('tSexo').value || null,
-    telefono:           document.getElementById('tTelefono').value.trim() || null,
+    telefono:           document.getElementById('tCelular').value.trim() || null,
     email:              document.getElementById('tEmail').value.trim() || null,
     direccion:          document.getElementById('tDireccion').value.trim() || null,
     cargo:              document.getElementById('tCargo').value.trim(),
@@ -1108,6 +1149,7 @@ document.getElementById('btnGuardarTrab').addEventListener('click', async () => 
 });
 
 async function toggleActivoTrab(id, activo) {
+  if (currentUser?.rol === 'consulta') { toast('Sin permisos para esta acción', 'error'); return; }
   const accion = activo ? 'dar de baja' : 'reactivar';
   if (!confirm(`¿Desea ${accion} a este trabajador?`)) return;
   try {
@@ -1190,6 +1232,7 @@ function editarHorario(id) {
 }
 
 document.getElementById('btnGuardarHorario').addEventListener('click', async () => {
+  if (currentUser?.rol === 'consulta') { toast('Sin permisos para esta acción', 'error'); return; }
   const codigo = document.getElementById('hCodigo').value.trim();
   if (!codigo || !document.getElementById('hNombre').value.trim()) {
     toast('Código y nombre son obligatorios', 'error'); return;
@@ -1250,6 +1293,7 @@ document.getElementById('btnNuevaAsig').addEventListener('click', () => {
 });
 
 document.getElementById('btnGuardarAsig').addEventListener('click', async () => {
+  if (currentUser?.rol === 'consulta') { toast('Sin permisos para esta acción', 'error'); return; }
   const tid = document.getElementById('aTrabajador').value;
   const hid = document.getElementById('aHorario').value;
   const des = document.getElementById('aDesde').value;
@@ -1342,6 +1386,7 @@ async function rechazarPermiso(id) {
 }
 
 document.getElementById('btnGuardarPermiso').addEventListener('click', async () => {
+  if (currentUser?.rol === 'consulta') { toast('Sin permisos para esta acción', 'error'); return; }
   const tid = document.getElementById('pTrabajador').value;
   const des = document.getElementById('pDesde').value;
   const has = document.getElementById('pHasta').value;
@@ -1392,6 +1437,7 @@ document.getElementById('btnNuevoFeriado').addEventListener('click', () => {
 });
 
 document.getElementById('btnGuardarFeriado').addEventListener('click', async () => {
+  if (currentUser?.rol === 'consulta') { toast('Sin permisos para esta acción', 'error'); return; }
   const fecha = document.getElementById('fFecha').value;
   const desc  = document.getElementById('fDesc').value.trim();
   if (!fecha || !desc) { toast('Fecha y descripción son obligatorios', 'error'); return; }
@@ -1454,6 +1500,7 @@ document.getElementById('searchMarca').addEventListener('input', () => {
 document.getElementById('btnRefreshMarca').addEventListener('click', cargarMarcaciones);
 
 async function anularMarcacion(id) {
+  if (currentUser?.rol === 'consulta') { toast('Sin permisos para esta acción', 'error'); return; }
   const motivo = prompt('Motivo de anulación:');
   if (motivo === null) return;
   try {
@@ -1522,6 +1569,7 @@ document.getElementById('btnNuevoUsuario').addEventListener('click', () => {
 });
 
 document.getElementById('btnGuardarUsuario').addEventListener('click', async () => {
+  if (currentUser?.rol !== 'admin') { toast('Solo administradores pueden gestionar usuarios', 'error'); return; }
   const username = document.getElementById('uUsername').value.trim();
   const password = document.getElementById('uPassword').value;
   const nombre   = document.getElementById('uNombre').value.trim();
