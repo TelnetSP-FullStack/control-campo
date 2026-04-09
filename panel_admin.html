@@ -175,7 +175,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   <div class="login-box">
     <div class="login-logo">▸ TELNET SP</div>
     <div class="login-title">Panel de Administración</div>
-    <div class="login-sub">Acceso restringido a personal autorizado</div>
+    <div class="login-sub">Acceso restringido a personal no autorizado</div>
     <div class="field">
       <label>Usuario</label>
       <input type="text" id="loginUser" placeholder="usuario" autocomplete="off">
@@ -1557,13 +1557,18 @@ async function toggleUsuario(id, activo) {
 //  El agente corre en el servidor de la oficina en localhost:8765
 //  El panel se comunica con él para disparar extracciones manuales
 // ═══════════════════════════════════════════════════════════════
-const AGENTE_URL = 'http://localhost:8765';
+// Edge Function puente — Supabase llama al agente via ngrok
+const FN_PUENTE = 'https://ajubapgkgadrthwcgjci.supabase.co/functions/v1/agente-puente';
+const FN_HEADERS = { 'apikey': SB_ANON, 'Content-Type': 'application/json' };
 
 async function verificarAgente() {
   const el = document.getElementById('agenteStatus');
   if (!el) return;
   try {
-    const r = await fetch(AGENTE_URL + '/ping', { signal: AbortSignal.timeout(3000) });
+    const r = await fetch(FN_PUENTE + '?accion=ping', {
+      headers: FN_HEADERS,
+      signal: AbortSignal.timeout(8000)
+    });
     const d = await r.json();
     if (d.status === 'ok') {
       el.innerHTML = '<span style="color:var(--success)">● Agente conectado</span>';
@@ -1577,10 +1582,10 @@ async function verificarAgente() {
 
 document.getElementById('btnExtraerBio').addEventListener('click', async () => {
   const resultDiv = document.getElementById('extraerResult');
-  const btn = document.getElementById('btnExtraerBio');
+  const btn       = document.getElementById('btnExtraerBio');
 
-  // Pedir rango de fechas
-  const hoy = new Date().toISOString().slice(0,10);
+  // Rango de fechas
+  const hoy  = new Date().toISOString().slice(0,10);
   const ayer = new Date(Date.now() - 86400000).toISOString().slice(0,10);
   const ini  = prompt('Fecha inicio (YYYY-MM-DD):', ayer);
   if (!ini) return;
@@ -1593,8 +1598,8 @@ document.getElementById('btnExtraerBio').addEventListener('click', async () => {
 
   try {
     const r = await fetch(
-      `${AGENTE_URL}/extraer?ini=${ini}&fin=${fin}`,
-      { signal: AbortSignal.timeout(120000) }  // 2 minutos timeout
+      `${FN_PUENTE}?accion=extraer&ini=${ini}&fin=${fin}`,
+      { headers: FN_HEADERS, signal: AbortSignal.timeout(120000) }
     );
     const d = await r.json();
 
@@ -1611,12 +1616,10 @@ document.getElementById('btnExtraerBio').addEventListener('click', async () => {
         <div>Duplicados: <strong style="color:var(--muted)">${d.duplicados}</strong></div>
       </div>
       ${d.error ? `<div style="color:var(--danger)">${d.error}</div>` : ''}
-      ${d.errores > 0 ? `<div style="color:var(--warn)">${d.errores} registros con error — revisar log del agente</div>` : ''}
+      ${d.errores > 0 ? `<div style="color:var(--warn)">${d.errores} registros con error</div>` : ''}
     `;
-
     if (d.insertados > 0) {
       toast(`✓ ${d.insertados} marcaciones importadas del biométrico`, 'success');
-      // Recargar marcaciones si está en la página correcta
       setTimeout(cargarMarcaciones, 1000);
     } else if (!d.error) {
       toast('Sin registros nuevos en el período seleccionado');
@@ -1626,9 +1629,9 @@ document.getElementById('btnExtraerBio').addEventListener('click', async () => {
     resultDiv.innerHTML = `
       <div style="color:var(--danger);margin-bottom:8px">✗ No se pudo conectar al agente</div>
       <div style="color:var(--muted);font-size:11px">
-        Verifique que el agente está corriendo en el servidor de la oficina.<br>
-        El agente debe estar en la misma red que el biométrico.<br>
-        Comando para iniciar: <strong>python agente_biometrico.py --servidor</strong>
+        Verifique que ngrok y el agente están corriendo en la PC de la oficina.<br>
+        Comando agente: <strong>python agente_biometrico.py --servidor</strong><br>
+        Comando ngrok: <strong>ngrok http 8765</strong>
       </div>
     `;
     toast('Agente no disponible', 'error');
