@@ -971,6 +971,7 @@ function iniciarApp() {
   cargarTrabajadores();
   cargarHorarios();
   verificarPermisosPendientes();
+  poblarFiltroDetalleTrab();
 }
 
 document.getElementById('btnLogout').addEventListener('click', () => {
@@ -997,6 +998,7 @@ document.querySelectorAll('.nav-item[data-page]').forEach(item => {
     if (page === 'permisos')      cargarPermisos();
     if (page === 'feriados')      cargarFeriados();
     if (page === 'marcaciones')   cargarMarcaciones();
+    if (page === 'reportes')      poblarFiltroDetalleTrab();
     if (page === 'usuarios')      cargarUsuarios();
   });
 });
@@ -1789,13 +1791,28 @@ function renderDetalle(data) {
 }
 
 // Poblar select de trabajadores en detalle
-function poblarFiltroDetalleTrab() {
+async function poblarFiltroDetalleTrab() {
   const sel = document.getElementById('filtroDetalleTrab');
-  if (!sel || !allTrab.length) return;
-  sel.innerHTML = '<option value="">Todos</option>' +
-    allTrab.filter(t=>t.activo).map(t =>
-      `<option value="${t.id}">${t.nombres} ${t.apellido_paterno}</option>`
-    ).join('');
+  if (!sel) return;
+  // Si allTrab ya está cargado usarlo directamente
+  if (allTrab.length > 0) {
+    sel.innerHTML = '<option value="">Todos</option>' +
+      allTrab.filter(t=>t.activo).map(t =>
+        `<option value="${t.id}">${t.nombres} ${t.apellido_paterno} (${t.dni})</option>`
+      ).join('');
+    return;
+  }
+  // Si no, cargar desde Supabase
+  try {
+    const data = await sbGet('trabajadores',
+      'select=id,nombres,apellido_paterno,dni&activo=eq.true&order=apellido_paterno.asc');
+    sel.innerHTML = '<option value="">Todos</option>' +
+      data.map(t =>
+        `<option value="${t.id}">${t.nombres} ${t.apellido_paterno} (${t.dni})</option>`
+      ).join('');
+  } catch(e) {
+    console.warn('No se pudo cargar trabajadores para filtro:', e);
+  }
 }
 
 // ── EXPORTAR ─────────────────────────────────────────────────
