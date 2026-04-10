@@ -494,7 +494,6 @@ body.rol-jefe .nav-item[data-page="usuarios"] {
                     <th style="text-align:center">Min. tard.</th>
                     <th style="text-align:center">Min. H.Extra</th>
                     <th>Observaciones</th>
-                    <th>Observaciones</th>
                   </tr>
                 </thead>
                 <tbody id="tbodyResumenReporte">
@@ -1698,21 +1697,27 @@ function renderResumen(data) {
   document.getElementById('rStatExtra').textContent = (totExtra/60).toFixed(1)+'h';
   document.getElementById('statsReporte').style.display = 'grid';
 
-  tbody.innerHTML = rows.map(r => `
+  tbody.innerHTML = rows.map(r => {
+    const obs = [];
+    if ((r.dias_permiso_goce||0) > 0)  obs.push(`Permiso c/goce: ${r.dias_permiso_goce}d`);
+    if ((r.dias_vacaciones||0) > 0)    obs.push(`Vacaciones: ${r.dias_vacaciones}d`);
+    if ((r.dias_feriado||0) > 0)       obs.push(`Feriados: ${r.dias_feriado}d`);
+    return `
     <tr>
       <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${r.dni}</td>
       <td><strong>${r.nombre_completo}</strong><br><span style="font-size:11px;color:var(--muted)">${r.cargo}</span></td>
       <td>${badgeTipo(r.tipo_trabajador)}</td>
       <td style="font-family:var(--mono);text-align:center">${r.dias_asistidos||0}</td>
-      <td style="font-family:var(--mono);text-align:center;color:var(--danger)">${r.dias_falta||0}</td>
-      <td style="font-family:var(--mono);text-align:center;color:var(--warn)">${r.dias_tardanza||0}</td>
+      <td style="font-family:var(--mono);text-align:center;color:${(r.dias_falta||0)>0?'var(--danger)':'inherit'}">${r.dias_falta||0}</td>
+      <td style="font-family:var(--mono);text-align:center;color:${(r.dias_tardanza||0)>0?'var(--warn)':'inherit'}">${r.dias_tardanza||0}</td>
+      <td style="font-family:var(--mono);text-align:center;color:var(--accent2)">${r.dias_permiso_goce||0}</td>
+      <td style="font-family:var(--mono);text-align:center;color:var(--accent2)">${r.dias_vacaciones||0}</td>
       <td style="font-family:var(--mono);text-align:center">${r.total_horas_trabajadas||'0.00'} h</td>
-      <td style="font-family:var(--mono);text-align:center;color:var(--warn)">${r.total_min_tardanza||0}</td>
-      <td style="font-family:var(--mono);text-align:right;color:var(--danger)">S/ ${parseFloat(r.monto_descuento_tardanza||0).toFixed(2)}</td>
-      <td style="font-family:var(--mono);text-align:center;color:var(--success)">${r.total_min_horas_extra||0}</td>
-      <td style="font-family:var(--mono);text-align:right;color:var(--success)">S/ ${parseFloat(r.monto_horas_extra||0).toFixed(2)}</td>
-      <td style="font-family:var(--mono);text-align:right">S/ ${parseFloat(r.sueldo_base||0).toFixed(2)}</td>
-    </tr>`).join('');
+      <td style="font-family:var(--mono);text-align:center;color:${(r.total_min_tardanza||0)>0?'var(--warn)':'inherit'}">${r.total_min_tardanza||0}</td>
+      <td style="font-family:var(--mono);text-align:center;color:${(r.total_min_horas_extra||0)>0?'var(--success)':'inherit'}">${r.total_min_horas_extra||0}</td>
+      <td style="font-size:11px;color:var(--muted)">${obs.join(' | ') || '—'}</td>
+    </tr>`;
+  }).join('');
 
   // Totales
   const fmt = (n, dec=2) => parseFloat(n||0).toFixed(dec);
