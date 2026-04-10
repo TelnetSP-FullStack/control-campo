@@ -435,25 +435,135 @@ body.rol-jefe .nav-item[data-page="usuarios"] {
       <!-- ── PÁGINA: REPORTES ───────────────────────────────── -->
       <div class="page" id="page-reportes">
         <div class="page-hdr">
-          <div><div class="page-title">Reportes de asistencia</div><div class="page-sub">Resumen mensual por trabajador</div></div>
+          <div><div class="page-title">Reportes de asistencia</div><div class="page-sub">Resumen mensual y detalle diario</div></div>
+          <div style="display:flex;gap:10px;">
+            <button class="btn btn-secondary" id="btnExportCSV" style="display:none">⬇ Exportar CSV</button>
+            <button class="btn btn-secondary" id="btnExportXLS" style="display:none">⬇ Exportar Excel</button>
+          </div>
         </div>
-        <div style="display:flex;gap:10px;margin-bottom:16px">
-          <input type="month" id="filtroMesReporte" class="search-box" style="width:auto">
-          <button class="btn btn-primary" id="btnCargarReporte">Cargar reporte</button>
+
+        <!-- Tabs de reportes -->
+        <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px;">
+          <div class="modal-tab active" id="tabResumen" onclick="switchReporte('resumen')">📊 Resumen Mensual</div>
+          <div class="modal-tab" id="tabDetalle" onclick="switchReporte('detalle')">📅 Detalle Diario</div>
         </div>
-        <div class="data-table-wrap">
-          <table>
-            <thead>
-              <tr><th>Trabajador</th><th>Tipo</th><th>Días asistidos</th><th>Tardanzas</th><th>Faltas</th><th>Horas trabajadas</th><th>H. Extra</th><th>Permisos</th></tr>
-            </thead>
-            <tbody id="tbodyReporte">
-              <tr><td colspan="8"><div class="empty-state"><div class="empty-ico">📊</div><p>Seleccione un mes y haga clic en Cargar reporte</p></div></td></tr>
-            </tbody>
-          </table>
+
+        <!-- Panel Resumen Mensual -->
+        <div id="panelResumen">
+          <div style="display:flex;gap:10px;margin-bottom:16px;align-items:flex-end;flex-wrap:wrap;">
+            <div>
+              <div style="font-size:11px;font-family:var(--mono);color:var(--muted);margin-bottom:4px;">MES</div>
+              <input type="month" id="filtroMesReporte" class="search-box" style="width:auto">
+            </div>
+            <button class="btn btn-primary" id="btnCargarReporte">Cargar reporte</button>
+          </div>
+
+          <!-- Stats resumen -->
+          <div id="statsReporte" style="display:none;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px;" class="stats-row">
+            <div class="stat-card accent"><div class="stat-val" id="rStatTrab">—</div><div class="stat-label">Trabajadores</div></div>
+            <div class="stat-card blue"><div class="stat-val" id="rStatAsist">—</div><div class="stat-label">Días promedio asistidos</div></div>
+            <div class="stat-card danger"><div class="stat-val" id="rStatFaltas">—</div><div class="stat-label">Total faltas</div></div>
+            <div class="stat-card warn"><div class="stat-val" id="rStatTard">—</div><div class="stat-label">Total tardanzas</div></div>
+            <div class="stat-card" style="background:var(--surface);border:1px solid var(--border);">
+              <div class="stat-val" style="color:var(--success)" id="rStatExtra">—</div>
+              <div class="stat-label">Total H. Extra</div>
+            </div>
+          </div>
+
+          <div class="data-table-wrap">
+            <div class="table-toolbar" style="flex-wrap:wrap;gap:8px;">
+              <input class="search-box" id="searchReporte" placeholder="Buscar trabajador…" style="flex:1;min-width:200px;">
+              <select id="filtroTipoReporte" class="search-box" style="flex:0;width:auto;padding:7px 10px">
+                <option value="">Todos los tipos</option>
+                <option value="Administrativo">Administrativo</option>
+                <option value="Campo">Campo</option>
+                <option value="Mixto">Mixto</option>
+              </select>
+            </div>
+            <div style="overflow-x:auto;">
+              <table id="tablaResumenReporte" style="min-width:900px;">
+                <thead>
+                  <tr>
+                    <th>DNI</th><th>Trabajador</th><th>Tipo</th>
+                    <th style="text-align:center">Asistidos</th>
+                    <th style="text-align:center">Faltas</th>
+                    <th style="text-align:center">Tardanzas</th>
+                    <th style="text-align:center">Horas trab.</th>
+                    <th style="text-align:center">Min. tard.</th>
+                    <th style="text-align:right">Desc. tard. S/</th>
+                    <th style="text-align:center">Min. extra</th>
+                    <th style="text-align:right">Monto extra S/</th>
+                    <th style="text-align:right">Sueldo S/</th>
+                  </tr>
+                </thead>
+                <tbody id="tbodyResumenReporte">
+                  <tr><td colspan="12"><div class="empty-state"><div class="empty-ico">📊</div><p>Seleccione un mes y haga clic en Cargar reporte</p></div></td></tr>
+                </tbody>
+                <tfoot id="tfootResumen" style="display:none">
+                  <tr style="background:var(--card);font-weight:600;">
+                    <td colspan="3" style="padding:10px 16px;font-family:var(--mono);font-size:12px;">TOTALES</td>
+                    <td id="totAsist"  style="text-align:center;padding:10px 16px;font-family:var(--mono);font-size:12px;"></td>
+                    <td id="totFaltas" style="text-align:center;padding:10px 16px;font-family:var(--mono);font-size:12px;color:var(--danger);"></td>
+                    <td id="totTard"   style="text-align:center;padding:10px 16px;font-family:var(--mono);font-size:12px;color:var(--warn);"></td>
+                    <td id="totHoras"  style="text-align:center;padding:10px 16px;font-family:var(--mono);font-size:12px;"></td>
+                    <td id="totMinTard"style="text-align:center;padding:10px 16px;font-family:var(--mono);font-size:12px;"></td>
+                    <td id="totDescTard" style="text-align:right;padding:10px 16px;font-family:var(--mono);font-size:12px;color:var(--danger);"></td>
+                    <td id="totMinExtra" style="text-align:center;padding:10px 16px;font-family:var(--mono);font-size:12px;"></td>
+                    <td id="totExtra"  style="text-align:right;padding:10px 16px;font-family:var(--mono);font-size:12px;color:var(--success);"></td>
+                    <td id="totSueldo" style="text-align:right;padding:10px 16px;font-family:var(--mono);font-size:12px;"></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Panel Detalle Diario -->
+        <div id="panelDetalle" style="display:none;">
+          <div style="display:flex;gap:10px;margin-bottom:16px;align-items:flex-end;flex-wrap:wrap;">
+            <div>
+              <div style="font-size:11px;font-family:var(--mono);color:var(--muted);margin-bottom:4px;">DESDE</div>
+              <input type="date" id="filtroDetalleDesde" class="search-box" style="width:auto">
+            </div>
+            <div>
+              <div style="font-size:11px;font-family:var(--mono);color:var(--muted);margin-bottom:4px;">HASTA</div>
+              <input type="date" id="filtroDetalleHasta" class="search-box" style="width:auto">
+            </div>
+            <div>
+              <div style="font-size:11px;font-family:var(--mono);color:var(--muted);margin-bottom:4px;">TRABAJADOR</div>
+              <select id="filtroDetalleTrab" class="search-box" style="width:auto;padding:7px 10px">
+                <option value="">Todos</option>
+              </select>
+            </div>
+            <button class="btn btn-primary" id="btnCargarDetalle">Cargar detalle</button>
+          </div>
+
+          <div class="data-table-wrap">
+            <div style="overflow-x:auto;">
+              <table id="tablaDetalleReporte" style="min-width:1000px;">
+                <thead>
+                  <tr>
+                    <th>Fecha</th><th>Trabajador</th><th>Cargo</th>
+                    <th>Entrada prog.</th><th>Salida prog.</th>
+                    <th>Primera entrada</th><th>Última salida</th>
+                    <th style="text-align:center">Horas trab.</th>
+                    <th style="text-align:center">Tard. min</th>
+                    <th style="text-align:right">Desc. S/</th>
+                    <th style="text-align:center">Extra min</th>
+                    <th style="text-align:right">Extra S/</th>
+                    <th>Estado</th>
+                  </tr>
+                </thead>
+                <tbody id="tbodyDetalleReporte">
+                  <tr><td colspan="13"><div class="empty-state"><div class="empty-ico">📅</div><p>Seleccione un rango de fechas y haga clic en Cargar detalle</p></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
 
-      <!-- ── PÁGINA: USUARIOS PANEL ─────────────────────────── -->
+<!-- ── PÁGINA: USUARIOS PANEL ─────────────────────────── -->
       <div class="page" id="page-usuarios">
         <div class="page-hdr">
           <div><div class="page-title">Usuarios del panel</div><div class="page-sub">Gestión de accesos de administración</div></div>
@@ -545,7 +655,7 @@ body.rol-jefe .nav-item[data-page="usuarios"] {
           </div>
           <div class="form-field"><label>Tarifa por hora (S/)</label><input type="number" id="tTarifaHora" placeholder="0.00" step="0.01"></div>
           <div class="form-field"><label>Asignación familiar</label>
-            <select id="tAsigFam"><option value="false">No</option><option value="true">Sí (S/ 102.50)</option></select>
+            <select id="tAsigFam"><option value="false">No</option><option value="true">Sí (S/ 113.00)</option></select>
           </div>
           <div class="form-section">Sistema de pensiones</div>
           <div class="form-field"><label>Régimen de pensión *</label>
@@ -1187,6 +1297,7 @@ async function cargarHorarios() {
 }
 
 function poblarSelectTrab() {
+  poblarFiltroDetalleTrab();
   const opts = '<option value="">— Seleccionar —</option>' +
     allTrab.filter(t => t.activo).map(t => `<option value="${t.id}">${t.nombres} ${t.apellido_paterno} (${t.dni})</option>`).join('');
   ['aTrabajador','pTrabajador'].forEach(id => { document.getElementById(id).innerHTML = opts; });
@@ -1513,31 +1624,284 @@ async function anularMarcacion(id) {
 // ═══════════════════════════════════════════════════════════════
 //  REPORTES
 // ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+//  REPORTES — Resumen Mensual + Detalle Diario + Exportar
+// ═══════════════════════════════════════════════════════════════
 document.getElementById('filtroMesReporte').value = new Date().toISOString().slice(0,7);
 
+// Datos en memoria para exportar
+let reporteData    = [];
+let detalleData    = [];
+let reporteActivo  = 'resumen';
+
+function switchReporte(tipo) {
+  reporteActivo = tipo;
+  document.getElementById('tabResumen').classList.toggle('active', tipo === 'resumen');
+  document.getElementById('tabDetalle').classList.toggle('active', tipo === 'detalle');
+  document.getElementById('panelResumen').style.display = tipo === 'resumen' ? '' : 'none';
+  document.getElementById('panelDetalle').style.display = tipo === 'detalle' ? '' : 'none';
+  const hasData = tipo === 'resumen' ? reporteData.length > 0 : detalleData.length > 0;
+  document.getElementById('btnExportCSV').style.display = hasData ? '' : 'none';
+  document.getElementById('btnExportXLS').style.display = hasData ? '' : 'none';
+}
+
+// ── Resumen Mensual ───────────────────────────────────────────
 document.getElementById('btnCargarReporte').addEventListener('click', async () => {
   const mes = document.getElementById('filtroMesReporte').value;
   if (!mes) { toast('Seleccione un mes', 'error'); return; }
   const btn = document.getElementById('btnCargarReporte');
   btn.innerHTML = '<span class="spinner"></span> Cargando…'; btn.disabled = true;
   try {
-    const data = await sbGet('v_resumen_asistencia_mensual',
+    reporteData = await sbGet('v_resumen_asistencia_mensual',
       `mes=eq.${mes}-01&order=nombre_completo.asc&select=*`);
-    const tbody = document.getElementById('tbodyReporte');
-    tbody.innerHTML = data.map(r => `
-      <tr>
-        <td><strong>${r.nombre_completo}</strong><br><span style="font-size:11px;color:var(--muted)">${r.cargo}</span></td>
-        <td>${badgeTipo(r.tipo_trabajador)}</td>
-        <td style="font-family:var(--mono);text-align:center">${r.dias_asistidos||0}</td>
-        <td style="font-family:var(--mono);text-align:center;color:var(--warn)">${r.dias_tardanza||0}</td>
-        <td style="font-family:var(--mono);text-align:center;color:var(--danger)">${r.dias_falta||0}</td>
-        <td style="font-family:var(--mono)">${r.total_horas_trabajadas||'0.00'} h</td>
-        <td style="font-family:var(--mono);color:var(--success)">${r.total_min_horas_extra ? Math.round(r.total_min_horas_extra/60*100)/100 + ' h' : '—'}</td>
-        <td style="font-family:var(--mono);text-align:center">${(r.dias_permiso_goce||0)+(r.dias_vacaciones||0)}</td>
-      </tr>`).join('') || `<tr><td colspan="8"><div class="empty-state"><div class="empty-ico">📊</div><p>No hay datos para este período</p></div></td></tr>`;
+    renderResumen(reporteData);
+    document.getElementById('btnExportCSV').style.display = reporteData.length ? '' : 'none';
+    document.getElementById('btnExportXLS').style.display = reporteData.length ? '' : 'none';
   } catch(e) { toast('Error: ' + e.message, 'error'); }
   finally { btn.innerHTML = 'Cargar reporte'; btn.disabled = false; }
 });
+
+['searchReporte','filtroTipoReporte'].forEach(id => {
+  document.getElementById(id).addEventListener('input',  () => renderResumen(reporteData));
+  document.getElementById(id).addEventListener('change', () => renderResumen(reporteData));
+});
+
+function renderResumen(data) {
+  const q    = document.getElementById('searchReporte').value.toLowerCase();
+  const tipo = document.getElementById('filtroTipoReporte').value;
+  const rows = data.filter(r => {
+    if (q    && !(r.nombre_completo||'').toLowerCase().includes(q) &&
+                !(r.dni||'').includes(q)) return false;
+    if (tipo && r.tipo_trabajador !== tipo) return false;
+    return true;
+  });
+
+  const tbody = document.getElementById('tbodyResumenReporte');
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="12"><div class="empty-state"><div class="empty-ico">🔍</div><p>Sin datos para este filtro</p></div></td></tr>`;
+    document.getElementById('tfootResumen').style.display = 'none';
+    document.getElementById('statsReporte').style.display = 'none';
+    return;
+  }
+
+  // Stats
+  const totFaltas = rows.reduce((s,r) => s+(r.dias_falta||0), 0);
+  const totTard   = rows.reduce((s,r) => s+(r.dias_tardanza||0), 0);
+  const totExtra  = rows.reduce((s,r) => s+(r.total_min_horas_extra||0), 0);
+  const promAsist = (rows.reduce((s,r) => s+(r.dias_asistidos||0), 0) / rows.length).toFixed(1);
+  document.getElementById('rStatTrab').textContent  = rows.length;
+  document.getElementById('rStatAsist').textContent = promAsist;
+  document.getElementById('rStatFaltas').textContent= totFaltas;
+  document.getElementById('rStatTard').textContent  = totTard;
+  document.getElementById('rStatExtra').textContent = (totExtra/60).toFixed(1)+'h';
+  document.getElementById('statsReporte').style.display = 'grid';
+
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${r.dni}</td>
+      <td><strong>${r.nombre_completo}</strong><br><span style="font-size:11px;color:var(--muted)">${r.cargo}</span></td>
+      <td>${badgeTipo(r.tipo_trabajador)}</td>
+      <td style="font-family:var(--mono);text-align:center">${r.dias_asistidos||0}</td>
+      <td style="font-family:var(--mono);text-align:center;color:var(--danger)">${r.dias_falta||0}</td>
+      <td style="font-family:var(--mono);text-align:center;color:var(--warn)">${r.dias_tardanza||0}</td>
+      <td style="font-family:var(--mono);text-align:center">${r.total_horas_trabajadas||'0.00'} h</td>
+      <td style="font-family:var(--mono);text-align:center;color:var(--warn)">${r.total_min_tardanza||0}</td>
+      <td style="font-family:var(--mono);text-align:right;color:var(--danger)">S/ ${parseFloat(r.monto_descuento_tardanza||0).toFixed(2)}</td>
+      <td style="font-family:var(--mono);text-align:center;color:var(--success)">${r.total_min_horas_extra||0}</td>
+      <td style="font-family:var(--mono);text-align:right;color:var(--success)">S/ ${parseFloat(r.monto_horas_extra||0).toFixed(2)}</td>
+      <td style="font-family:var(--mono);text-align:right">S/ ${parseFloat(r.sueldo_base||0).toFixed(2)}</td>
+    </tr>`).join('');
+
+  // Totales
+  const fmt = (n, dec=2) => parseFloat(n||0).toFixed(dec);
+  document.getElementById('totAsist').textContent   = rows.reduce((s,r)=>s+(r.dias_asistidos||0),0);
+  document.getElementById('totFaltas').textContent  = rows.reduce((s,r)=>s+(r.dias_falta||0),0);
+  document.getElementById('totTard').textContent    = rows.reduce((s,r)=>s+(r.dias_tardanza||0),0);
+  document.getElementById('totHoras').textContent   = fmt(rows.reduce((s,r)=>s+parseFloat(r.total_horas_trabajadas||0),0))+' h';
+  document.getElementById('totMinTard').textContent = rows.reduce((s,r)=>s+(r.total_min_tardanza||0),0);
+  document.getElementById('totDescTard').textContent= 'S/ '+fmt(rows.reduce((s,r)=>s+parseFloat(r.monto_descuento_tardanza||0),0));
+  document.getElementById('totMinExtra').textContent= rows.reduce((s,r)=>s+(r.total_min_horas_extra||0),0);
+  document.getElementById('totExtra').textContent   = 'S/ '+fmt(rows.reduce((s,r)=>s+parseFloat(r.monto_horas_extra||0),0));
+  document.getElementById('totSueldo').textContent  = 'S/ '+fmt(rows.reduce((s,r)=>s+parseFloat(r.sueldo_base||0),0));
+  document.getElementById('tfootResumen').style.display = '';
+}
+
+// ── Detalle Diario ────────────────────────────────────────────
+const hoy = new Date();
+const ayer = new Date(hoy - 86400000*6);
+document.getElementById('filtroDetalleDesde').value = ayer.toISOString().slice(0,10);
+document.getElementById('filtroDetalleHasta').value = hoy.toISOString().slice(0,10);
+
+document.getElementById('btnCargarDetalle').addEventListener('click', async () => {
+  const desde = document.getElementById('filtroDetalleDesde').value;
+  const hasta = document.getElementById('filtroDetalleHasta').value;
+  const trab  = document.getElementById('filtroDetalleTrab').value;
+  if (!desde || !hasta) { toast('Seleccione rango de fechas', 'error'); return; }
+  const btn = document.getElementById('btnCargarDetalle');
+  btn.innerHTML = '<span class="spinner"></span> Cargando…'; btn.disabled = true;
+  try {
+    let params = `fecha=gte.${desde}&fecha=lte.${hasta}&order=fecha.asc,nombre_completo.asc&select=*`;
+    if (trab) params += `&trabajador_id=eq.${trab}`;
+    detalleData = await sbGet('v_reporte_asistencia_detalle', params);
+    renderDetalle(detalleData);
+    document.getElementById('btnExportCSV').style.display = detalleData.length ? '' : 'none';
+    document.getElementById('btnExportXLS').style.display = detalleData.length ? '' : 'none';
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+  finally { btn.innerHTML = 'Cargar detalle'; btn.disabled = false; }
+});
+
+function estadoDiaBadge(estado) {
+  const m = {
+    'Asistio':    'badge-green',
+    'Tardanza':   'badge-amber',
+    'Falta':      'badge-red',
+    'Feriado':    'badge-blue',
+    'Permiso con goce': 'badge-teal',
+    'Vacaciones': 'badge-blue',
+    'Sin salida': 'badge-gray',
+    'Sin entrada':'badge-gray',
+  };
+  return `<span class="badge ${m[estado]||'badge-gray'}">${estado||'—'}</span>`;
+}
+
+function renderDetalle(data) {
+  const tbody = document.getElementById('tbodyDetalleReporte');
+  if (!data.length) {
+    tbody.innerHTML = `<tr><td colspan="13"><div class="empty-state"><div class="empty-ico">📅</div><p>Sin datos para este rango</p></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = data.map(r => `
+    <tr>
+      <td style="font-family:var(--mono);font-size:12px">${fmtFecha(r.fecha)}</td>
+      <td><strong style="font-size:13px">${r.nombre_completo}</strong></td>
+      <td style="font-size:11px;color:var(--muted)">${r.cargo||'—'}</td>
+      <td style="font-family:var(--mono);font-size:12px;color:var(--muted)">${fmtHora(r.hora_prog_entrada)}</td>
+      <td style="font-family:var(--mono);font-size:12px;color:var(--muted)">${fmtHora(r.hora_prog_salida)}</td>
+      <td style="font-family:var(--mono);font-size:12px;color:${r.tardanza_min>0?'var(--warn)':'var(--success)'}">${fmtHora(r.primera_entrada)}</td>
+      <td style="font-family:var(--mono);font-size:12px">${fmtHora(r.ultima_salida)}</td>
+      <td style="font-family:var(--mono);text-align:center;font-size:12px">${r.horas_trabajadas||'—'} h</td>
+      <td style="font-family:var(--mono);text-align:center;font-size:12px;color:var(--warn)">${r.tardanza_min||0}</td>
+      <td style="font-family:var(--mono);text-align:right;font-size:12px;color:var(--danger)">S/ ${parseFloat(r.monto_descuento_tardanza||0).toFixed(2)}</td>
+      <td style="font-family:var(--mono);text-align:center;font-size:12px;color:var(--success)">${r.horas_extra_min||0}</td>
+      <td style="font-family:var(--mono);text-align:right;font-size:12px;color:var(--success)">S/ ${parseFloat(r.monto_horas_extra||0).toFixed(2)}</td>
+      <td>${estadoDiaBadge(r.estado_dia)}</td>
+    </tr>`).join('');
+}
+
+// Poblar select de trabajadores en detalle
+function poblarFiltroDetalleTrab() {
+  const sel = document.getElementById('filtroDetalleTrab');
+  if (!sel || !allTrab.length) return;
+  sel.innerHTML = '<option value="">Todos</option>' +
+    allTrab.filter(t=>t.activo).map(t =>
+      `<option value="${t.id}">${t.nombres} ${t.apellido_paterno}</option>`
+    ).join('');
+}
+
+// ── EXPORTAR ─────────────────────────────────────────────────
+function exportarCSV() {
+  let headers, rows, filename;
+  if (reporteActivo === 'resumen') {
+    headers = ['DNI','Nombre','Cargo','Tipo','Dias Asistidos','Dias Falta','Dias Tardanza',
+               'Horas Trabajadas','Min Tardanza','Desc Tardanza S/','Min H.Extra','Monto H.Extra S/','Sueldo Base S/'];
+    rows = reporteData.map(r => [
+      r.dni, r.nombre_completo, r.cargo, r.tipo_trabajador,
+      r.dias_asistidos||0, r.dias_falta||0, r.dias_tardanza||0,
+      r.total_horas_trabajadas||0, r.total_min_tardanza||0,
+      parseFloat(r.monto_descuento_tardanza||0).toFixed(2),
+      r.total_min_horas_extra||0,
+      parseFloat(r.monto_horas_extra||0).toFixed(2),
+      parseFloat(r.sueldo_base||0).toFixed(2),
+    ]);
+    filename = `Resumen_Asistencia_${document.getElementById('filtroMesReporte').value}.csv`;
+  } else {
+    headers = ['Fecha','Trabajador','Cargo','Entrada Prog','Salida Prog',
+               'Primera Entrada','Ultima Salida','Horas Trab','Tard Min',
+               'Desc Tard S/','Extra Min','Extra S/','Estado'];
+    rows = detalleData.map(r => [
+      r.fecha, r.nombre_completo, r.cargo,
+      r.hora_prog_entrada||'', r.hora_prog_salida||'',
+      r.primera_entrada||'', r.ultima_salida||'',
+      r.horas_trabajadas||0, r.tardanza_min||0,
+      parseFloat(r.monto_descuento_tardanza||0).toFixed(2),
+      r.horas_extra_min||0,
+      parseFloat(r.monto_horas_extra||0).toFixed(2),
+      r.estado_dia||'',
+    ]);
+    filename = `Detalle_Asistencia_${document.getElementById('filtroDetalleDesde').value}_al_${document.getElementById('filtroDetalleHasta').value}.csv`;
+  }
+  // BOM para Excel en español (soporte caracteres especiales)
+  const bom  = '﻿';
+  const csv  = bom + [headers, ...rows].map(r =>
+    r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')
+  ).join('
+');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+  toast(`✓ Descargando ${filename}`);
+}
+
+function exportarExcel() {
+  // Exportar como TSV que Excel abre nativamente
+  let headers, rows, filename;
+  if (reporteActivo === 'resumen') {
+    headers = ['DNI','Nombre Completo','Cargo','Tipo','Dias Asistidos','Dias Falta',
+               'Dias Tardanza','Horas Trabajadas','Min Tardanza','Desc Tardanza S/',
+               'Min H.Extra','Monto H.Extra S/','Sueldo Base S/'];
+    rows = reporteData.map(r => [
+      r.dni, r.nombre_completo, r.cargo, r.tipo_trabajador,
+      r.dias_asistidos||0, r.dias_falta||0, r.dias_tardanza||0,
+      r.total_horas_trabajadas||0, r.total_min_tardanza||0,
+      parseFloat(r.monto_descuento_tardanza||0).toFixed(2),
+      r.total_min_horas_extra||0,
+      parseFloat(r.monto_horas_extra||0).toFixed(2),
+      parseFloat(r.sueldo_base||0).toFixed(2),
+    ]);
+    filename = `Resumen_Asistencia_${document.getElementById('filtroMesReporte').value}.xls`;
+  } else {
+    headers = ['Fecha','Trabajador','Cargo','Entrada Prog','Salida Prog',
+               'Primera Entrada','Ultima Salida','Horas Trab','Tard Min',
+               'Desc Tard S/','Extra Min','Extra S/','Estado'];
+    rows = detalleData.map(r => [
+      r.fecha, r.nombre_completo, r.cargo,
+      r.hora_prog_entrada||'', r.hora_prog_salida||'',
+      r.primera_entrada||'', r.ultima_salida||'',
+      r.horas_trabajadas||0, r.tardanza_min||0,
+      parseFloat(r.monto_descuento_tardanza||0).toFixed(2),
+      r.horas_extra_min||0,
+      parseFloat(r.monto_horas_extra||0).toFixed(2),
+      r.estado_dia||'',
+    ]);
+    filename = `Detalle_${document.getElementById('filtroDetalleDesde').value}_al_${document.getElementById('filtroDetalleHasta').value}.xls`;
+  }
+  // HTML table que Excel abre con formato
+  const tableHtml = `
+    <html xmlns:o="urn:schemas-microsoft-com:office:office"
+          xmlns:x="urn:schemas-microsoft-com:office:excel"
+          xmlns="http://www.w3.org/TR/REC-html40">
+    <head><meta charset="UTF-8">
+    <style>
+      th { background:#C0001A;color:white;font-weight:bold;padding:6px; }
+      td { padding:4px 8px;border:1px solid #ddd; }
+      tr:nth-child(even) td { background:#f9f9f9; }
+    </style></head><body>
+    <table border="1">
+      <thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead>
+      <tbody>${rows.map(r=>`<tr>${r.map(v=>`<td>${v}</td>`).join('')}</tr>`).join('')}</tbody>
+    </table></body></html>`;
+  const blob = new Blob([tableHtml], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+  toast(`✓ Descargando ${filename}`);
+}
+
+document.getElementById('btnExportCSV').addEventListener('click', exportarCSV);
+document.getElementById('btnExportXLS').addEventListener('click', exportarExcel);
 
 // ═══════════════════════════════════════════════════════════════
 //  USUARIOS DEL PANEL
