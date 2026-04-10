@@ -1831,11 +1831,10 @@ function exportarCSV() {
     filename = `Detalle_Asistencia_${document.getElementById('filtroDetalleDesde').value}_al_${document.getElementById('filtroDetalleHasta').value}.csv`;
   }
   // BOM para Excel en español (soporte caracteres especiales)
-  const bom  = '﻿';
+  const bom  = String.fromCharCode(0xFEFF);
   const csv  = bom + [headers, ...rows].map(r =>
     r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')
-  ).join('
-');
+  ).join('\\r\\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
