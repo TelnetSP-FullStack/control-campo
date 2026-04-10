@@ -488,12 +488,13 @@ body.rol-jefe .nav-item[data-page="usuarios"] {
                     <th style="text-align:center">Asistidos</th>
                     <th style="text-align:center">Faltas</th>
                     <th style="text-align:center">Tardanzas</th>
+                    <th style="text-align:center">Permisos</th>
+                    <th style="text-align:center">Vacaciones</th>
                     <th style="text-align:center">Horas trab.</th>
                     <th style="text-align:center">Min. tard.</th>
-                    <th style="text-align:right">Desc. tard. S/</th>
-                    <th style="text-align:center">Min. extra</th>
-                    <th style="text-align:right">Monto extra S/</th>
-                    <th style="text-align:right">Sueldo S/</th>
+                    <th style="text-align:center">Min. H.Extra</th>
+                    <th>Observaciones</th>
+                    <th>Observaciones</th>
                   </tr>
                 </thead>
                 <tbody id="tbodyResumenReporte">
@@ -502,15 +503,15 @@ body.rol-jefe .nav-item[data-page="usuarios"] {
                 <tfoot id="tfootResumen" style="display:none">
                   <tr style="background:var(--card);font-weight:600;">
                     <td colspan="3" style="padding:10px 16px;font-family:var(--mono);font-size:12px;">TOTALES</td>
-                    <td id="totAsist"  style="text-align:center;padding:10px 16px;font-family:var(--mono);font-size:12px;"></td>
-                    <td id="totFaltas" style="text-align:center;padding:10px 16px;font-family:var(--mono);font-size:12px;color:var(--danger);"></td>
-                    <td id="totTard"   style="text-align:center;padding:10px 16px;font-family:var(--mono);font-size:12px;color:var(--warn);"></td>
-                    <td id="totHoras"  style="text-align:center;padding:10px 16px;font-family:var(--mono);font-size:12px;"></td>
-                    <td id="totMinTard"style="text-align:center;padding:10px 16px;font-family:var(--mono);font-size:12px;"></td>
-                    <td id="totDescTard" style="text-align:right;padding:10px 16px;font-family:var(--mono);font-size:12px;color:var(--danger);"></td>
-                    <td id="totMinExtra" style="text-align:center;padding:10px 16px;font-family:var(--mono);font-size:12px;"></td>
-                    <td id="totExtra"  style="text-align:right;padding:10px 16px;font-family:var(--mono);font-size:12px;color:var(--success);"></td>
-                    <td id="totSueldo" style="text-align:right;padding:10px 16px;font-family:var(--mono);font-size:12px;"></td>
+                    <td id="totAsist"    style="text-align:center;padding:10px 16px;font-family:var(--mono);font-size:12px;"></td>
+                    <td id="totFaltas"  style="text-align:center;padding:10px 16px;font-family:var(--mono);font-size:12px;color:var(--danger);"></td>
+                    <td id="totTard"    style="text-align:center;padding:10px 16px;font-family:var(--mono);font-size:12px;color:var(--warn);"></td>
+                    <td id="totPermisos"style="text-align:center;padding:10px 16px;font-family:var(--mono);font-size:12px;"></td>
+                    <td id="totVacac"   style="text-align:center;padding:10px 16px;font-family:var(--mono);font-size:12px;"></td>
+                    <td id="totHoras"   style="text-align:center;padding:10px 16px;font-family:var(--mono);font-size:12px;"></td>
+                    <td id="totMinTard" style="text-align:center;padding:10px 16px;font-family:var(--mono);font-size:12px;"></td>
+                    <td id="totMinExtra"style="text-align:center;padding:10px 16px;font-family:var(--mono);font-size:12px;color:var(--success);"></td>
+                    <td style="padding:10px 16px;"></td>
                   </tr>
                 </tfoot>
               </table>
@@ -548,10 +549,9 @@ body.rol-jefe .nav-item[data-page="usuarios"] {
                     <th>Primera entrada</th><th>Última salida</th>
                     <th style="text-align:center">Horas trab.</th>
                     <th style="text-align:center">Tard. min</th>
-                    <th style="text-align:right">Desc. S/</th>
-                    <th style="text-align:center">Extra min</th>
-                    <th style="text-align:right">Extra S/</th>
+                    <th style="text-align:center">H. Extra min</th>
                     <th>Estado</th>
+                    <th>Observaciones</th>
                   </tr>
                 </thead>
                 <tbody id="tbodyDetalleReporte">
@@ -644,7 +644,7 @@ body.rol-jefe .nav-item[data-page="usuarios"] {
       </div>
       <div id="tab-remuneracion" class="tab-content" style="display:none">
         <div class="form-grid">
-          <div class="form-field"><label>Sueldo base (S/) *</label><input type="number" id="tSueldo" placeholder="2000.00" step="0.01"></div>
+          <div class="form-field"><label>Sueldo base (S/) * <span style="font-weight:400;color:var(--muted);font-size:10px;">Mín. S/ 1,130.00</span></label><input type="number" id="tSueldo" placeholder="1130.00" step="0.01" min="1130"></div>
           <div class="form-field"><label>Modalidad de pago</label>
             <select id="tModalidadPago">
               <option value="Mensual">Mensual</option>
@@ -654,7 +654,7 @@ body.rol-jefe .nav-item[data-page="usuarios"] {
             </select>
           </div>
           <div class="form-field"><label>Tarifa por hora (S/)</label><input type="number" id="tTarifaHora" placeholder="0.00" step="0.01"></div>
-          <div class="form-field"><label>Asignación familiar</label>
+          <div class="form-field"><label>Asignación familiar <span style="font-weight:400;color:var(--muted);font-size:10px;">10% SML = S/ 113.00</span></label>
             <select id="tAsigFam"><option value="false">No</option><option value="true">Sí (S/ 113.00)</option></select>
           </div>
           <div class="form-section">Sistema de pensiones</div>
@@ -1716,15 +1716,14 @@ function renderResumen(data) {
 
   // Totales
   const fmt = (n, dec=2) => parseFloat(n||0).toFixed(dec);
-  document.getElementById('totAsist').textContent   = rows.reduce((s,r)=>s+(r.dias_asistidos||0),0);
-  document.getElementById('totFaltas').textContent  = rows.reduce((s,r)=>s+(r.dias_falta||0),0);
-  document.getElementById('totTard').textContent    = rows.reduce((s,r)=>s+(r.dias_tardanza||0),0);
-  document.getElementById('totHoras').textContent   = fmt(rows.reduce((s,r)=>s+parseFloat(r.total_horas_trabajadas||0),0))+' h';
-  document.getElementById('totMinTard').textContent = rows.reduce((s,r)=>s+(r.total_min_tardanza||0),0);
-  document.getElementById('totDescTard').textContent= 'S/ '+fmt(rows.reduce((s,r)=>s+parseFloat(r.monto_descuento_tardanza||0),0));
-  document.getElementById('totMinExtra').textContent= rows.reduce((s,r)=>s+(r.total_min_horas_extra||0),0);
-  document.getElementById('totExtra').textContent   = 'S/ '+fmt(rows.reduce((s,r)=>s+parseFloat(r.monto_horas_extra||0),0));
-  document.getElementById('totSueldo').textContent  = 'S/ '+fmt(rows.reduce((s,r)=>s+parseFloat(r.sueldo_base||0),0));
+  document.getElementById('totAsist').textContent    = rows.reduce((s,r)=>s+(r.dias_asistidos||0),0);
+  document.getElementById('totFaltas').textContent   = rows.reduce((s,r)=>s+(r.dias_falta||0),0);
+  document.getElementById('totTard').textContent     = rows.reduce((s,r)=>s+(r.dias_tardanza||0),0);
+  document.getElementById('totPermisos').textContent = rows.reduce((s,r)=>s+(r.dias_permiso_goce||0),0);
+  document.getElementById('totVacac').textContent    = rows.reduce((s,r)=>s+(r.dias_vacaciones||0),0);
+  document.getElementById('totHoras').textContent    = fmt(rows.reduce((s,r)=>s+parseFloat(r.total_horas_trabajadas||0),0))+' h';
+  document.getElementById('totMinTard').textContent  = rows.reduce((s,r)=>s+(r.total_min_tardanza||0),0);
+  document.getElementById('totMinExtra').textContent = rows.reduce((s,r)=>s+(r.total_min_horas_extra||0),0);
   document.getElementById('tfootResumen').style.display = '';
 }
 
@@ -1772,22 +1771,38 @@ function renderDetalle(data) {
     tbody.innerHTML = `<tr><td colspan="13"><div class="empty-state"><div class="empty-ico">📅</div><p>Sin datos para este rango</p></div></td></tr>`;
     return;
   }
-  tbody.innerHTML = data.map(r => `
+  tbody.innerHTML = data.map(r => {
+    // Observaciones automáticas según estado
+    const estadosObs = {
+      'Permiso con goce':    'Permiso con goce de haber',
+      'Permiso sin goce':    'Permiso sin goce de haber',
+      'Vacaciones':          'Período de vacaciones',
+      'Licencia médica':     'Licencia médica',
+      'Licencia por maternidad': 'Licencia maternidad',
+      'Licencia por paternidad': 'Licencia paternidad',
+      'Comisión de servicio':'Comisión de servicio',
+      'Falta justificada':   'Falta justificada',
+      'Feriado':             'Día feriado',
+      'Sin salida':          '⚠ Sin marcación de salida',
+      'Sin entrada':         '⚠ Sin marcación de entrada',
+    };
+    const obs = estadosObs[r.estado_dia] || '';
+    return `
     <tr>
       <td style="font-family:var(--mono);font-size:12px">${fmtFecha(r.fecha)}</td>
       <td><strong style="font-size:13px">${r.nombre_completo}</strong></td>
       <td style="font-size:11px;color:var(--muted)">${r.cargo||'—'}</td>
       <td style="font-family:var(--mono);font-size:12px;color:var(--muted)">${fmtHora(r.hora_prog_entrada)}</td>
       <td style="font-family:var(--mono);font-size:12px;color:var(--muted)">${fmtHora(r.hora_prog_salida)}</td>
-      <td style="font-family:var(--mono);font-size:12px;color:${r.tardanza_min>0?'var(--warn)':'var(--success)'}">${fmtHora(r.primera_entrada)}</td>
+      <td style="font-family:var(--mono);font-size:12px;color:${(r.tardanza_min||0)>0?'var(--warn)':'var(--success)'}">${fmtHora(r.primera_entrada)}</td>
       <td style="font-family:var(--mono);font-size:12px">${fmtHora(r.ultima_salida)}</td>
       <td style="font-family:var(--mono);text-align:center;font-size:12px">${r.horas_trabajadas||'—'} h</td>
-      <td style="font-family:var(--mono);text-align:center;font-size:12px;color:var(--warn)">${r.tardanza_min||0}</td>
-      <td style="font-family:var(--mono);text-align:right;font-size:12px;color:var(--danger)">S/ ${parseFloat(r.monto_descuento_tardanza||0).toFixed(2)}</td>
-      <td style="font-family:var(--mono);text-align:center;font-size:12px;color:var(--success)">${r.horas_extra_min||0}</td>
-      <td style="font-family:var(--mono);text-align:right;font-size:12px;color:var(--success)">S/ ${parseFloat(r.monto_horas_extra||0).toFixed(2)}</td>
+      <td style="font-family:var(--mono);text-align:center;font-size:12px;color:${(r.tardanza_min||0)>0?'var(--warn)':'var(--text)'}">${r.tardanza_min||0}</td>
+      <td style="font-family:var(--mono);text-align:center;font-size:12px;color:${(r.horas_extra_min||0)>0?'var(--success)':'var(--text)'}">${r.horas_extra_min||0}</td>
       <td>${estadoDiaBadge(r.estado_dia)}</td>
-    </tr>`).join('');
+      <td style="font-size:11px;color:var(--muted)">${obs}</td>
+    </tr>`;
+  }).join('');
 }
 
 // Poblar select de trabajadores en detalle
