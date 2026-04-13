@@ -2156,15 +2156,34 @@ document.getElementById('btnExtraerBio').addEventListener('click', async () => {
 // ═══════════════════════════════════════════════════════════════
 async function cargarAlertasIncompletas() {
   try {
-    const hoy  = new Date().toISOString().slice(0,10);
     const ayer = new Date(Date.now() - 86400000).toISOString().slice(0,10);
-    // Buscar Sin salida y Sin entrada de hoy y ayer
-    const data = await sbGet('v_marcaciones_incompletas',
-      `fecha=gte.${ayer}&order=fecha.desc,nombre_completo.asc&select=*`
+    // Consultar directamente periodos_laborales con join a trabajadores
+    const data = await sbGet('periodos_laborales',
+      `estado_dia=in.(Sin salida,Sin entrada)&fecha=gte.${ayer}&select=id,trabajador_id,fecha,primera_entrada,ultima_salida,sesiones,estado_dia,trabajadores(dni,nombres,apellido_paterno,cargo,tipo_trabajador),marcaciones(hora,tipo,ubicacion)&order=fecha.desc`
     );
+    // Transformar datos al formato esperado
+    const mapped = data.map(r => ({
+      trabajador_id:          r.trabajador_id,
+      dni:                    r.trabajadores?.dni || '',
+      nombre_completo:        r.trabajadores ? r.trabajadores.nombres + ' ' + r.trabajadores.apellido_paterno : '',
+      cargo:                  r.trabajadores?.cargo || '',
+      tipo_trabajador:        r.trabajadores?.tipo_trabajador || '',
+      fecha:                  r.fecha,
+      primera_entrada:        r.primera_entrada,
+      ultima_salida:          r.ultima_salida,
+      sesiones:               r.sesiones,
+      estado_dia:             r.estado_dia,
+      ultima_marcacion:       r.marcaciones?.length > 0 ?
+        r.marcaciones.sort((a,b) => b.hora.localeCompare(a.hora))[0].hora : null,
+      tipo_ultima_marcacion:  r.marcaciones?.length > 0 ?
+        r.marcaciones.sort((a,b) => b.hora.localeCompare(a.hora))[0].tipo : null,
+      ubicacion_ultima:       r.marcaciones?.length > 0 ?
+        r.marcaciones.sort((a,b) => b.hora.localeCompare(a.hora))[0].ubicacion : null,
+    }));
 
     const badge = document.getElementById('badgeIncompletas');
-    if (data.length > 0) {
+    if (mapped.length > 0) {
+      const data = mapped;
       badge.textContent = data.length;
       badge.style.display = '';
       document.getElementById('alertasIncompletas').style.display = '';
@@ -2194,7 +2213,7 @@ async function cargarAlertasIncompletas() {
       document.getElementById('alertasIncompletas').style.display = 'none';
     }
   } catch(e) {
-    console.warn('Error cargando alertas:', e);
+    console.warn('Error cargando alertas incompletas:', e.message);
   }
 }
 
