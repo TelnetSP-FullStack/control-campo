@@ -2156,7 +2156,7 @@ document.getElementById('btnExtraerBio').addEventListener('click', async () => {
 // ═══════════════════════════════════════════════════════════════
 async function cargarAlertasIncompletas() {
   try {
-    const ayer = new Date(Date.now() - 86400000).toISOString().slice(0,10);
+    const ayer = new Date(Date.now() - 86400000 * 30).toISOString().slice(0,10); // últimos 30 días
 
     // Paso 1: obtener periodos incompletos con datos del trabajador
     const periodos = await sbGet('periodos_laborales',
@@ -2224,6 +2224,12 @@ async function cargarAlertasIncompletas() {
           </td>
           <td style="padding:6px 8px">
             <span class="badge badge-amber">${r.estado_dia}</span>
+          </td>
+          <td style="padding:6px 8px;white-space:nowrap">
+            <button class="btn btn-secondary btn-sm"
+              onclick="abrirSalidaManual('${r.trabajador_id}','${r.nombre_completo}','${r.dni}','${r.fecha}','${r.primera_entrada||''}','${r.ubicacion_ultima||'Oficina Principal'}')">
+              ↓ Salida manual
+            </button>
           </td>
         </tr>`).join('');
     } else {
