@@ -415,6 +415,30 @@ body.rol-jefe .nav-item[data-page="usuarios"] {
           </div>
         </div>
         <div id="extraerResult" style="display:none;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px;font-family:var(--mono);font-size:12px"></div>
+
+        <!-- Panel de alertas marcaciones incompletas -->
+        <div id="alertasIncompletas" style="display:none;margin-bottom:16px;">
+          <div style="background:rgba(240,136,62,0.1);border:1px solid rgba(240,136,62,0.4);border-radius:var(--radius);padding:14px 16px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+              <div style="font-size:13px;font-weight:600;color:var(--warn);">
+                ⚠ Marcaciones incompletas — <span id="cntIncompletas">0</span> trabajador(es)
+              </div>
+              <button class="btn btn-secondary btn-sm" onclick="cargarAlertasIncompletas()">↺ Actualizar</button>
+            </div>
+            <table style="width:100%;font-size:12px;">
+              <thead>
+                <tr>
+                  <th style="text-align:left;padding:4px 8px;color:var(--muted);font-family:var(--mono);font-size:10px;">TRABAJADOR</th>
+                  <th style="text-align:left;padding:4px 8px;color:var(--muted);font-family:var(--mono);font-size:10px;">FECHA</th>
+                  <th style="text-align:left;padding:4px 8px;color:var(--muted);font-family:var(--mono);font-size:10px;">PRIMERA ENTRADA</th>
+                  <th style="text-align:left;padding:4px 8px;color:var(--muted);font-family:var(--mono);font-size:10px;">ÚLTIMA MARCA</th>
+                  <th style="text-align:left;padding:4px 8px;color:var(--muted);font-family:var(--mono);font-size:10px;">ESTADO</th>
+                </tr>
+              </thead>
+              <tbody id="tbodyIncompletas"></tbody>
+            </table>
+          </div>
+        </div>
         <div class="data-table-wrap">
           <div class="table-toolbar">
             <input type="date" id="filtroFechaMarca" class="search-box" style="flex:0;width:auto">
@@ -971,6 +995,7 @@ function iniciarApp() {
   cargarHorarios();
   verificarPermisosPendientes();
   poblarFiltroDetalleTrab();
+  cargarAlertasIncompletas();
 }
 
 document.getElementById('btnLogout').addEventListener('click', () => {
@@ -996,7 +1021,7 @@ document.querySelectorAll('.nav-item[data-page]').forEach(item => {
     if (page === 'asignaciones')  cargarAsignaciones();
     if (page === 'permisos')      cargarPermisos();
     if (page === 'feriados')      cargarFeriados();
-    if (page === 'marcaciones')   cargarMarcaciones();
+    if (page === 'marcaciones')   { cargarMarcaciones(); cargarAlertasIncompletas(); }
     if (page === 'reportes')      poblarFiltroDetalleTrab();
     if (page === 'usuarios')      cargarUsuarios();
   });
@@ -2088,6 +2113,53 @@ document.getElementById('btnExtraerBio').addEventListener('click', async () => {
     btn.disabled  = false;
   }
 });
+
+// ═══════════════════════════════════════════════════════════════
+//  ALERTAS: Marcaciones incompletas
+// ═══════════════════════════════════════════════════════════════
+async function cargarAlertasIncompletas() {
+  try {
+    const hoy  = new Date().toISOString().slice(0,10);
+    const ayer = new Date(Date.now() - 86400000).toISOString().slice(0,10);
+    // Buscar Sin salida y Sin entrada de hoy y ayer
+    const data = await sbGet('v_marcaciones_incompletas',
+      `fecha=gte.${ayer}&order=fecha.desc,nombre_completo.asc&select=*`
+    );
+
+    const badge = document.getElementById('badgeIncompletas');
+    if (data.length > 0) {
+      badge.textContent = data.length;
+      badge.style.display = '';
+      document.getElementById('alertasIncompletas').style.display = '';
+      document.getElementById('cntIncompletas').textContent = data.length;
+
+      document.getElementById('tbodyIncompletas').innerHTML = data.map(r => `
+        <tr style="border-top:1px solid rgba(48,54,61,0.5)">
+          <td style="padding:6px 8px">
+            <strong>${r.nombre_completo}</strong>
+            <span style="color:var(--muted);font-size:11px;margin-left:6px">${r.dni}</span>
+          </td>
+          <td style="padding:6px 8px;font-family:var(--mono)">${fmtFecha(r.fecha)}</td>
+          <td style="padding:6px 8px;font-family:var(--mono);color:var(--success)">${fmtHora(r.primera_entrada)}</td>
+          <td style="padding:6px 8px;font-family:var(--mono)">
+            ${fmtHora(r.ultima_marcacion)}
+            <span class="badge ${r.tipo_ultima_marcacion==='Entrada'?'badge-green':'badge-blue'}" style="margin-left:4px;font-size:10px">
+              ${r.tipo_ultima_marcacion||'—'}
+            </span>
+            <span style="color:var(--muted);font-size:10px;margin-left:4px">${r.ubicacion_ultima||''}</span>
+          </td>
+          <td style="padding:6px 8px">
+            <span class="badge badge-amber">${r.estado_dia}</span>
+          </td>
+        </tr>`).join('');
+    } else {
+      badge.style.display = 'none';
+      document.getElementById('alertasIncompletas').style.display = 'none';
+    }
+  } catch(e) {
+    console.warn('Error cargando alertas:', e);
+  }
+}
 
 // Verificar estado del agente al cargar la página de marcaciones
 const _origCargarMarcaciones = window.cargarMarcaciones;
