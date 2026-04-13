@@ -2201,10 +2201,11 @@ async function cargarAlertasIncompletas() {
     const badge = document.getElementById('badgeIncompletas');
     if (mapped.length > 0) {
       const data = mapped;
-      badge.textContent = data.length;
-      badge.style.display = '';
-      document.getElementById('alertasIncompletas').style.display = '';
-      document.getElementById('cntIncompletas').textContent = data.length;
+      if (badge) { badge.textContent = data.length; badge.style.display = ''; }
+      const panelAlert = document.getElementById('alertasIncompletas');
+      if (panelAlert) panelAlert.style.display = '';
+      const cntEl = document.getElementById('cntIncompletas');
+      if (cntEl) cntEl.textContent = data.length;
 
       document.getElementById('tbodyIncompletas').innerHTML = data.map(r => `
         <tr style="border-top:1px solid rgba(48,54,61,0.5)">
@@ -2226,8 +2227,9 @@ async function cargarAlertasIncompletas() {
           </td>
         </tr>`).join('');
     } else {
-      badge.style.display = 'none';
-      document.getElementById('alertasIncompletas').style.display = 'none';
+      if (badge) badge.style.display = 'none';
+      const panelAlert = document.getElementById('alertasIncompletas');
+      if (panelAlert) panelAlert.style.display = 'none';
     }
   } catch(e) {
     console.warn('Error cargando alertas incompletas:', e.message);
