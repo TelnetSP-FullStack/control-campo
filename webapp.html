@@ -875,6 +875,26 @@ async function registerAction(tipo) {
     return;
   }
 
+  // ── Validación anti-suplantación: verificar estado actual ──────
+  // Si intenta marcar Entrada pero ya tiene una entrada sin salida → bloquear
+  if (tipo === 'Entrada' && isOnline && currentUser) {
+    try {
+      const hoy = new Date().toISOString().slice(0,10);
+      const resp = await fetch(
+        `${CONFIG.SUPABASE_URL}/rest/v1/periodos_laborales?trabajador_id=eq.${currentUser.id}&fecha=eq.${hoy}&select=estado_dia,primera_entrada,ultima_salida`,
+        { headers: { 'apikey': CONFIG.SUPABASE_ANON, 'Authorization': 'Bearer ' + CONFIG.SUPABASE_ANON } }
+      );
+      const periodos = await resp.json();
+      if (periodos.length > 0 && periodos[0].estado_dia === 'Sin salida') {
+        showToast('⚠ Tiene una entrada sin salida registrada hoy. Registre su salida antes de marcar una nueva entrada.');
+        return;
+      }
+    } catch(e) {
+      // Si falla la verificación, continuar (no bloquear por error de red)
+      console.warn('No se pudo verificar estado previo:', e);
+    }
+  }
+
   const now = new Date();
   const pad = n => String(n).padStart(2,'0');
   // Fecha para mostrar al usuario
@@ -1001,7 +1021,7 @@ document.getElementById('btnLogin').addEventListener('click', async () => {
       const name  = data.nombre.toUpperCase();
       const cargo = data.cargo || '';
       // Guardar temporalmente hasta que confirme
-      pendingUser = { dni: data.dni, nombre: name, cargo };
+      pendingUser = { id: data.id || null, dni: data.dni, nombre: name, cargo };
       const initials = name.split(' ').map(w=>w[0]).join('').slice(0,2);
       document.getElementById('confirmAvatar').textContent = initials;
       document.getElementById('confirmName').textContent   = name;
