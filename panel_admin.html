@@ -2157,28 +2157,45 @@ document.getElementById('btnExtraerBio').addEventListener('click', async () => {
 async function cargarAlertasIncompletas() {
   try {
     const ayer = new Date(Date.now() - 86400000).toISOString().slice(0,10);
-    // Consultar directamente periodos_laborales con join a trabajadores
-    const data = await sbGet('periodos_laborales',
-      `estado_dia=in.(Sin salida,Sin entrada)&fecha=gte.${ayer}&select=id,trabajador_id,fecha,primera_entrada,ultima_salida,sesiones,estado_dia,trabajadores(dni,nombres,apellido_paterno,cargo,tipo_trabajador),marcaciones(hora,tipo,ubicacion)&order=fecha.desc`
+
+    // Paso 1: obtener periodos incompletos con datos del trabajador
+    const periodos = await sbGet('periodos_laborales',
+      `estado_dia=in.(Sin salida,Sin entrada)&fecha=gte.${ayer}&select=trabajador_id,fecha,primera_entrada,ultima_salida,sesiones,estado_dia,trabajadores(id,dni,nombres,apellido_paterno,cargo,tipo_trabajador)&order=fecha.desc`
     );
-    // Transformar datos al formato esperado
-    const mapped = data.map(r => ({
-      trabajador_id:          r.trabajador_id,
-      dni:                    r.trabajadores?.dni || '',
-      nombre_completo:        r.trabajadores ? r.trabajadores.nombres + ' ' + r.trabajadores.apellido_paterno : '',
-      cargo:                  r.trabajadores?.cargo || '',
-      tipo_trabajador:        r.trabajadores?.tipo_trabajador || '',
-      fecha:                  r.fecha,
-      primera_entrada:        r.primera_entrada,
-      ultima_salida:          r.ultima_salida,
-      sesiones:               r.sesiones,
-      estado_dia:             r.estado_dia,
-      ultima_marcacion:       r.marcaciones?.length > 0 ?
-        r.marcaciones.sort((a,b) => b.hora.localeCompare(a.hora))[0].hora : null,
-      tipo_ultima_marcacion:  r.marcaciones?.length > 0 ?
-        r.marcaciones.sort((a,b) => b.hora.localeCompare(a.hora))[0].tipo : null,
-      ubicacion_ultima:       r.marcaciones?.length > 0 ?
-        r.marcaciones.sort((a,b) => b.hora.localeCompare(a.hora))[0].ubicacion : null,
+
+    if (!periodos.length) {
+      document.getElementById('badgeIncompletas').style.display = 'none';
+      document.getElementById('alertasIncompletas').style.display = 'none';
+      return;
+    }
+
+    // Paso 2: para cada periodo, buscar la última marcación del día
+    const mapped = await Promise.all(periodos.map(async r => {
+      let ultima = null;
+      try {
+        const marcas = await sbGet('marcaciones',
+          `trabajador_id=eq.${r.trabajador_id}&fecha=eq.${r.fecha}&estado=eq.Activo&select=hora,tipo,ubicacion&order=hora.desc&limit=1`
+        );
+        ultima = marcas.length > 0 ? marcas[0] : null;
+      } catch(e) { /* ignorar error individual */ }
+
+      return {
+        trabajador_id:         r.trabajador_id,
+        dni:                   r.trabajadores?.dni || '',
+        nombre_completo:       r.trabajadores
+          ? r.trabajadores.nombres + ' ' + r.trabajadores.apellido_paterno
+          : '',
+        cargo:                 r.trabajadores?.cargo || '',
+        tipo_trabajador:       r.trabajadores?.tipo_trabajador || '',
+        fecha:                 r.fecha,
+        primera_entrada:       r.primera_entrada,
+        ultima_salida:         r.ultima_salida,
+        sesiones:              r.sesiones,
+        estado_dia:            r.estado_dia,
+        ultima_marcacion:      ultima?.hora || null,
+        tipo_ultima_marcacion: ultima?.tipo || null,
+        ubicacion_ultima:      ultima?.ubicacion || null,
+      };
     }));
 
     const badge = document.getElementById('badgeIncompletas');
