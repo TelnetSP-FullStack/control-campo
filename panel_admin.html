@@ -260,7 +260,13 @@ body.rol-jefe .nav-item[data-page="usuarios"] {
       <div class="nav-item" data-page="reportes">
         <span class="nav-ico">📊</span>Reportes
       </div>
+      <div class="nav-item" data-page="fotos">
+        <span class="nav-ico">📷</span>Fotos verificación
+      </div>
       <div class="nav-section">Sistema</div>
+      <div class="nav-item" data-page="fotos">
+        <span class="nav-ico">📷</span>Fotos verificación
+      </div>
       <div class="nav-item" data-page="usuarios">
         <span class="nav-ico">🔐</span>Usuarios panel
       </div>
@@ -587,7 +593,78 @@ body.rol-jefe .nav-item[data-page="usuarios"] {
         </div>
       </div>
 
-<!-- ── PÁGINA: USUARIOS PANEL ─────────────────────────── -->
+      <!-- ── PÁGINA: FOTOS ──────────────────────────────────── -->
+      <div class="page" id="page-fotos">
+        <div class="page-hdr">
+          <div><div class="page-title">Fotos de verificación</div><div class="page-sub">Galería de fotos tomadas al registrar marcaciones</div></div>
+        </div>
+        <div style="display:flex;gap:10px;margin-bottom:16px;align-items:flex-end;flex-wrap:wrap;">
+          <div>
+            <div style="font-size:11px;font-family:var(--mono);color:var(--muted);margin-bottom:4px;">FECHA</div>
+            <input type="date" id="fotosFecha" class="search-box" style="width:auto">
+          </div>
+          <div>
+            <div style="font-size:11px;font-family:var(--mono);color:var(--muted);margin-bottom:4px;">TRABAJADOR</div>
+            <select id="fotosTrab" class="search-box" style="width:auto;padding:7px 10px">
+              <option value="">Todos</option>
+            </select>
+          </div>
+          <div>
+            <div style="font-size:11px;font-family:var(--mono);color:var(--muted);margin-bottom:4px;">TIPO</div>
+            <select id="fotosTipo" class="search-box" style="width:auto;padding:7px 10px">
+              <option value="">Entrada y Salida</option>
+              <option value="Entrada">Solo Entrada</option>
+              <option value="Salida">Solo Salida</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" id="btnCargarFotos">Ver fotos</button>
+        </div>
+        <div id="fotosStats" style="display:none;font-size:12px;font-family:var(--mono);color:var(--muted);margin-bottom:16px;"></div>
+        <div id="fotosGaleria" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;">
+          <div style="grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--muted);">
+            <div style="font-size:40px;margin-bottom:12px;opacity:.4">📷</div>
+            <p style="font-size:14px;">Seleccione una fecha y haga clic en Ver fotos</p>
+          </div>
+        </div>
+        <div id="modalFotoAmp" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:500;align-items:center;justify-content:center;flex-direction:column;" onclick="cerrarFotoAmp()">
+          <div style="position:relative;max-width:90vw;max-height:85vh;" onclick="event.stopPropagation()">
+            <img id="fotoAmpImg" src="" style="max-width:90vw;max-height:80vh;border-radius:12px;object-fit:contain;">
+            <div id="fotoAmpInfo" style="text-align:center;margin-top:12px;color:white;font-family:var(--mono);font-size:13px;"></div>
+          </div>
+          <button onclick="cerrarFotoAmp()" style="margin-top:16px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.3);color:white;padding:8px 24px;border-radius:8px;cursor:pointer;font-size:14px;">✕ Cerrar</button>
+        </div>
+      </div>
+
+      <!-- ── PÁGINA: FOTOS VERIFICACIÓN ───────────────────────── -->
+      <div class="page" id="page-fotos">
+        <div class="page-hdr">
+          <div><div class="page-title">Fotos de verificación</div>
+          <div class="page-sub">Evidencia fotográfica de marcaciones — se eliminan automáticamente a los 3 días</div></div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <input type="date" id="filtroFotosFecha" class="search-box" style="width:auto">
+            <select id="filtroFotosTrab" class="search-box" style="width:auto;padding:7px 10px">
+              <option value="">Todos los trabajadores</option>
+            </select>
+            <button class="btn btn-primary" id="btnCargarFotos">Ver fotos</button>
+          </div>
+        </div>
+
+        <!-- Stats -->
+        <div id="fotosStats" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;margin-bottom:16px;font-family:var(--mono);font-size:12px;color:var(--muted)">
+          <span id="fotosCount">0</span> fotos encontradas
+          <span style="margin-left:16px;color:var(--warn)" id="fotosSinFoto"></span>
+        </div>
+
+        <!-- Galería -->
+        <div id="galeriaFotos" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;">
+          <div style="grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--muted)">
+            <div style="font-size:40px;margin-bottom:12px;opacity:.4">📷</div>
+            <p>Seleccione una fecha para ver las fotos</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── PÁGINA: USUARIOS PANEL ─────────────────────────── -->
       <div class="page" id="page-usuarios">
         <div class="page-hdr">
           <div><div class="page-title">Usuarios del panel</div><div class="page-sub">Gestión de accesos de administración</div></div>
@@ -832,6 +909,28 @@ body.rol-jefe .nav-item[data-page="usuarios"] {
   </div>
 </div>
 
+<!-- ── MODAL VISOR DE FOTO ──────────────────────────────────── -->
+<div class="modal-overlay" id="modalFoto">
+  <div class="modal" style="width:480px;background:var(--bg)">
+    <div class="modal-hdr" style="background:var(--bg)">
+      <div>
+        <div class="modal-title" id="fotoTrabajador">—</div>
+        <div style="font-size:11px;font-family:var(--mono);color:var(--muted)" id="fotoDetalle">—</div>
+      </div>
+      <button class="modal-close" onclick="cerrarModal('modalFoto')">×</button>
+    </div>
+    <div class="modal-body" style="padding:12px;background:var(--bg)">
+      <img id="fotoImagen" src="" alt="Foto de verificación"
+        style="width:100%;border-radius:10px;object-fit:cover;max-height:420px;">
+      <div style="display:flex;gap:10px;margin-top:12px;justify-content:center;">
+        <a id="fotoDescargar" href="" download="foto_marcacion.jpg"
+          class="btn btn-secondary btn-sm">⬇ Descargar</a>
+        <button class="btn btn-secondary btn-sm" onclick="cerrarModal('modalFoto')">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ── MODAL SALIDA MANUAL ──────────────────────────────────── -->
 <div class="modal-overlay" id="modalSalidaManual">
   <div class="modal" style="width:440px">
@@ -1059,8 +1158,22 @@ document.querySelectorAll('.nav-item[data-page]').forEach(item => {
     if (page === 'permisos')      cargarPermisos();
     if (page === 'feriados')      cargarFeriados();
     if (page === 'marcaciones')   { cargarMarcaciones(); cargarAlertasIncompletas(); }
+    if (page === 'fotos')         {
+      const hoy = new Date().toISOString().slice(0,10);
+      document.getElementById('filtroFotosFecha').value = hoy;
+      // Poblar select de trabajadores
+      const sel = document.getElementById('filtroFotosTrab');
+      if (sel && allTrab.length > 0 && sel.options.length <= 1) {
+        sel.innerHTML = '<option value="">Todos los trabajadores</option>' +
+          allTrab.filter(t=>t.activo).map(t =>
+            `<option value="${t.id}">${t.nombres} ${t.apellido_paterno}</option>`
+          ).join('');
+      }
+      cargarGaleriaFotos();
+    }
     if (page === 'reportes')      poblarFiltroDetalleTrab();
     if (page === 'usuarios')      cargarUsuarios();
+    if (page === 'fotos')         iniciarPaginaFotos();
   });
 });
 
@@ -1661,6 +1774,11 @@ async function cargarMarcaciones() {
         <td>${m.tipo === 'Entrada' ? '<span class="badge badge-green">Entrada</span>' : '<span class="badge badge-blue">Salida</span>'}</td>
         <td><span class="badge ${m.fuente==='Biometrico'?'badge-amber':'badge-teal'}">${m.fuente}</span></td>
         <td style="font-size:12px">${m.ubicacion||'—'}</td>
+        <td>${m.foto_url ?
+          `<img src="${m.foto_url}" onclick="verFoto('${m.foto_url}','${m.trabajadores ? m.trabajadores.nombres+' '+m.trabajadores.apellido_paterno : m.dni}','${m.fecha}','${m.hora}')"
+            style="width:36px;height:36px;object-fit:cover;border-radius:6px;cursor:pointer;border:2px solid var(--accent);"
+            title="Ver foto de verificación">`
+          : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
         <td><span class="badge badge-green">Activo</span></td>
         <td><button class="btn btn-danger btn-sm" onclick="anularMarcacion(${m.id})">Anular</button></td>
       </tr>`).join('') || `<tr><td colspan="9"><div class="empty-state"><div class="empty-ico">📍</div><p>No hay marcaciones para este filtro</p></div></td></tr>`;
@@ -2063,6 +2181,107 @@ async function toggleUsuario(id, activo) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+//  MÓDULO: FOTOS DE VERIFICACIÓN
+// ═══════════════════════════════════════════════════════════════
+function iniciarPaginaFotos() {
+  // Fecha por defecto: hoy
+  const hoy = new Date().toISOString().slice(0,10);
+  document.getElementById('fotosFecha').value = hoy;
+  // Poblar selector de trabajadores
+  const sel = document.getElementById('fotosTrab');
+  sel.innerHTML = '<option value="">Todos</option>' +
+    allTrab.filter(t=>t.activo).map(t =>
+      `<option value="${t.id}">${t.nombres} ${t.apellido_paterno} (${t.dni})</option>`
+    ).join('');
+}
+
+document.getElementById('btnCargarFotos').addEventListener('click', cargarFotos);
+
+async function cargarFotos() {
+  const fecha = document.getElementById('fotosFecha').value;
+  const trabId = document.getElementById('fotosTrab').value;
+  const tipo   = document.getElementById('fotosTipo').value;
+
+  if (!fecha) { toast('Seleccione una fecha', 'error'); return; }
+
+  const btn = document.getElementById('btnCargarFotos');
+  btn.innerHTML = '<span class="spinner"></span> Cargando…';
+  btn.disabled  = true;
+
+  try {
+    let params = `fecha=eq.${fecha}&foto_url=not.is.null&estado=eq.Activo&select=id,dni,fecha,hora,tipo,foto_url,ubicacion,trabajadores(nombres,apellido_paterno)&order=hora.asc`;
+    if (trabId) params += `&trabajador_id=eq.${trabId}`;
+    if (tipo)   params += `&tipo=eq.${tipo}`;
+
+    const data = await sbGet('marcaciones', params);
+
+    const galeria = document.getElementById('fotosGaleria');
+    const stats   = document.getElementById('fotosStats');
+
+    if (!data.length) {
+      stats.style.display = 'none';
+      galeria.innerHTML = `
+        <div style="grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--muted);">
+          <div style="font-size:40px;margin-bottom:12px;opacity:.4">📷</div>
+          <p style="font-size:14px;">No hay fotos para los filtros seleccionados</p>
+          <p style="font-size:12px;margin-top:6px;">Las fotos se generan cuando los trabajadores usan la app móvil</p>
+        </div>`;
+      return;
+    }
+
+    stats.style.display = '';
+    stats.textContent   = `${data.length} foto(s) encontrada(s) — ${fmtFecha(fecha)}`;
+
+    galeria.innerHTML = data.map(m => {
+      const nombre = m.trabajadores
+        ? m.trabajadores.nombres + ' ' + m.trabajadores.apellido_paterno
+        : m.dni;
+      const tipoColor = m.tipo === 'Entrada' ? 'var(--success)' : 'var(--accent2)';
+      const tipoIcon  = m.tipo === 'Entrada' ? '↑' : '↓';
+      return `
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;cursor:pointer;transition:border-color .15s;"
+          onmouseover="this.style.borderColor='var(--accent)'"
+          onmouseout="this.style.borderColor='var(--border)'"
+          onclick="verFotoAmp('${m.foto_url}','${nombre}','${fmtFecha(m.fecha)} ${fmtHora(m.hora)}','${m.tipo}','${m.ubicacion||''}')">
+          <div style="position:relative;aspect-ratio:4/3;background:#000;overflow:hidden;">
+            <img src="${m.foto_url}"
+              style="width:100%;height:100%;object-fit:cover;"
+              onerror="this.parentElement.innerHTML='<div style=\'height:100%;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;\'>Sin imagen</div>'">
+            <div style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.7);border-radius:6px;padding:3px 8px;font-size:11px;font-family:var(--mono);color:${tipoColor};">
+              ${tipoIcon} ${m.tipo}
+            </div>
+          </div>
+          <div style="padding:10px 12px;">
+            <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${nombre}</div>
+            <div style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-top:3px;">
+              ${fmtHora(m.hora)}  •  ${m.ubicacion||'—'}
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+
+  } catch(e) {
+    toast('Error cargando fotos: ' + e.message, 'error');
+  } finally {
+    btn.innerHTML = 'Ver fotos';
+    btn.disabled  = false;
+  }
+}
+
+function verFotoAmp(url, nombre, fechaHora, tipo, ubicacion) {
+  const modal = document.getElementById('modalFotoAmp');
+  document.getElementById('fotoAmpImg').src = url;
+  document.getElementById('fotoAmpInfo').innerHTML =
+    `<strong>${nombre}</strong>  •  ${fechaHora}  •  ${tipo}  •  ${ubicacion}`;
+  modal.style.display = 'flex';
+}
+
+function cerrarFotoAmp() {
+  document.getElementById('modalFotoAmp').style.display = 'none';
+  document.getElementById('fotoAmpImg').src = '';
+}
+
+// ═══════════════════════════════════════════════════════════════
 //  AGENTE BIOMÉTRICO
 //  El agente corre en el servidor de la oficina en localhost:8765
 //  El panel se comunica con él para disparar extracciones manuales
@@ -2328,6 +2547,84 @@ document.getElementById('btnGuardarSalidaManual').addEventListener('click', asyn
     btn.disabled  = false;
   }
 });
+
+// ═══════════════════════════════════════════════════════════════
+//  VISOR DE FOTOS
+// ═══════════════════════════════════════════════════════════════
+function verFoto(url, nombre, fecha, hora) {
+  document.getElementById('fotoImagen').src        = url;
+  document.getElementById('fotoTrabajador').textContent = nombre;
+  document.getElementById('fotoDetalle').textContent    = `${fmtFecha(fecha)}  ${fmtHora(hora)}`;
+  document.getElementById('fotoDescargar').href         = url;
+  document.getElementById('fotoDescargar').download     = `foto_${nombre.replace(/ /g,'_')}_${fecha}.jpg`;
+  abrirModal('modalFoto');
+}
+
+// Cargar galería de fotos
+document.getElementById('btnCargarFotos').addEventListener('click', cargarGaleriaFotos);
+document.getElementById('filtroFotosFecha').addEventListener('change', () => {
+  if (document.getElementById('filtroFotosFecha').value) cargarGaleriaFotos();
+});
+
+async function cargarGaleriaFotos() {
+  const fecha = document.getElementById('filtroFotosFecha').value;
+  const trab  = document.getElementById('filtroFotosTrab').value;
+  if (!fecha) { toast('Seleccione una fecha', 'error'); return; }
+
+  const btn = document.getElementById('btnCargarFotos');
+  btn.innerHTML = '<span class="spinner"></span>'; btn.disabled = true;
+
+  try {
+    let params = `fecha=eq.${fecha}&fuente=eq.App&estado=eq.Activo&select=id,dni,fecha,hora,tipo,foto_url,ubicacion,trabajadores(nombres,apellido_paterno)&order=hora.asc`;
+    if (trab) params += `&trabajador_id=eq.${trab}`;
+
+    const data = await sbGet('marcaciones', params);
+    const conFoto = data.filter(m => m.foto_url);
+    const sinFoto = data.filter(m => !m.foto_url);
+
+    document.getElementById('fotosStats').style.display = '';
+    document.getElementById('fotosCount').textContent   = conFoto.length;
+    document.getElementById('fotosSinFoto').textContent = sinFoto.length > 0
+      ? `${sinFoto.length} marcaciones sin foto` : '';
+
+    const galeria = document.getElementById('galeriaFotos');
+    if (!conFoto.length) {
+      galeria.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--muted)">
+        <div style="font-size:40px;margin-bottom:12px;opacity:.4">📷</div>
+        <p>No hay fotos para esta fecha${trab ? ' y trabajador' : ''}</p>
+      </div>`;
+      return;
+    }
+
+    galeria.innerHTML = conFoto.map(m => {
+      const nombre = m.trabajadores
+        ? m.trabajadores.nombres + ' ' + m.trabajadores.apellido_paterno
+        : m.dni;
+      return `
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;cursor:pointer;"
+           onclick="verFoto('${m.foto_url}','${nombre}','${m.fecha}','${m.hora}')">
+        <div style="position:relative;aspect-ratio:4/3;overflow:hidden;background:#000">
+          <img src="${m.foto_url}" alt="${nombre}"
+            style="width:100%;height:100%;object-fit:cover;transition:transform .2s"
+            onmouseover="this.style.transform='scale(1.05)'"
+            onmouseout="this.style.transform='scale(1)'"
+            onerror="this.parentElement.innerHTML='<div style=\'display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font-size:12px\'>Sin imagen</div>'">
+          <div style="position:absolute;top:6px;right:6px">
+            <span class="badge ${m.tipo==='Entrada'?'badge-green':'badge-blue'}" style="font-size:10px">${m.tipo}</span>
+          </div>
+        </div>
+        <div style="padding:10px 12px">
+          <div style="font-size:12px;font-weight:600;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${nombre}</div>
+          <div style="font-size:11px;font-family:var(--mono);color:var(--muted)">${fmtHora(m.hora)} — ${m.ubicacion||'—'}</div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    toast('Error cargando fotos: ' + e.message, 'error');
+  } finally {
+    btn.innerHTML = 'Ver fotos'; btn.disabled = false;
+  }
+}
 
 // Verificar estado del agente al cargar la página de marcaciones
 const _origCargarMarcaciones = window.cargarMarcaciones;

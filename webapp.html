@@ -915,7 +915,8 @@ async function registerAction(tipo) {
     maps_url: `https://maps.google.com/?q=${gpsCoords.lat.toFixed(7)},${gpsCoords.lng.toFixed(7)}`,
     offline:  isOnline ? 'NO' : 'SI',
     fuente:   'App',
-    ts:       now.toISOString()
+    ts:       now.toISOString(),
+    foto_url: currentUser.fotoUrl || null
   };
 
   const btn = tipo === 'Entrada' ? document.getElementById('btnEntrada') : document.getElementById('btnSalida');
