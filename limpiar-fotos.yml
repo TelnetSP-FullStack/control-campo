@@ -1,0 +1,61 @@
+name: Limpiar fotos antiguas - TelnetSP
+
+on:
+  schedule:
+    # Ejecutar todos los días a las 2:00 AM hora Perú (UTC-5 = 07:00 UTC)
+    - cron: '0 7 * * *'
+  workflow_dispatch:
+    # Permite ejecutar manualmente desde GitHub Actions
+    inputs:
+      motivo:
+        description: 'Motivo de ejecución manual'
+        required: false
+        default: 'Limpieza manual solicitada'
+
+jobs:
+  limpiar-fotos:
+    name: Eliminar fotos con más de 3 días
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Llamar Edge Function limpiar-fotos
+        id: limpiar
+        run: |
+          RESPONSE=$(curl -s -X POST \
+            "https://ajubapgkgadrthwcgjci.supabase.co/functions/v1/limpiar-fotos" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Content-Type: application/json" \
+            --max-time 60)
+          
+          echo "Respuesta: $RESPONSE"
+          
+          STATUS=$(echo $RESPONSE | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('status','error'))")
+          ELIMINADOS=$(echo $RESPONSE | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('eliminados',0))")
+          MSG=$(echo $RESPONSE | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('msg',''))")
+          
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+          echo "eliminados=$ELIMINADOS" >> $GITHUB_OUTPUT
+          echo "msg=$MSG" >> $GITHUB_OUTPUT
+          
+          echo "✓ Estado: $STATUS"
+          echo "✓ Fotos eliminadas: $ELIMINADOS"
+          echo "✓ Mensaje: $MSG"
+          
+          # Fallar si hubo error
+          if [ "$STATUS" = "error" ]; then
+            echo "✗ Error en la limpieza"
+            exit 1
+          fi
+
+      - name: Resumen
+        if: always()
+        run: |
+          echo "================================================"
+          echo "  TelnetSP - Limpieza de fotos completada"
+          echo "================================================"
+          echo "  Fecha: $(date '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "  Estado: ${{ steps.limpiar.outputs.status }}"
+          echo "  Fotos eliminadas: ${{ steps.limpiar.outputs.eliminados }}"
+          echo "  Mensaje: ${{ steps.limpiar.outputs.msg }}"
+          echo "================================================"
