@@ -264,9 +264,6 @@ body.rol-jefe .nav-item[data-page="usuarios"] {
         <span class="nav-ico">📷</span>Fotos verificación
       </div>
       <div class="nav-section">Sistema</div>
-      <div class="nav-item" data-page="fotos">
-        <span class="nav-ico">📷</span>Fotos verificación
-      </div>
       <div class="nav-item" data-page="usuarios">
         <span class="nav-ico">🔐</span>Usuarios panel
       </div>
@@ -905,6 +902,55 @@ body.rol-jefe .nav-item[data-page="usuarios"] {
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="cerrarModal('modalPermiso')">Cancelar</button>
       <button class="btn btn-primary" id="btnGuardarPermiso">Guardar permiso</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL EDITAR USUARIO ─────────────────────────────────── -->
+<div class="modal-overlay" id="modalEditarUsuario">
+  <div class="modal" style="width:420px">
+    <div class="modal-hdr">
+      <div class="modal-title" id="modalEditarUsuarioTitle">Editar usuario</div>
+      <button class="modal-close" onclick="cerrarModal('modalEditarUsuario')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-field full">
+          <label>Usuario</label>
+          <input type="text" id="euUsername" disabled
+            style="opacity:.5;cursor:not-allowed;">
+        </div>
+        <div class="form-field full">
+          <label>Nombre completo *</label>
+          <input type="text" id="euNombre" placeholder="Juan Pérez">
+        </div>
+        <div class="form-field">
+          <label>Rol *</label>
+          <select id="euRol">
+            <option value="admin">Administrador</option>
+            <option value="jefe_area">Jefe de área</option>
+            <option value="consulta">Solo consulta</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Área</label>
+          <input type="text" id="euArea" placeholder="RRHH">
+        </div>
+        <div class="form-section">Cambiar contraseña (opcional)</div>
+        <div class="form-field full">
+          <label>Nueva contraseña <span style="font-weight:400;color:var(--muted);font-size:10px;">Dejar vacío para no cambiar</span></label>
+          <input type="password" id="euPassword" placeholder="••••••••" autocomplete="new-password">
+        </div>
+        <div class="form-field full">
+          <label>Confirmar contraseña</label>
+          <input type="password" id="euPasswordConfirm" placeholder="••••••••" autocomplete="new-password">
+        </div>
+      </div>
+      <div id="euError" style="display:none;font-size:12px;color:var(--danger);font-family:var(--mono);margin-top:8px;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="cerrarModal('modalEditarUsuario')">Cancelar</button>
+      <button class="btn btn-primary" id="btnGuardarEditarUsuario">Guardar cambios</button>
     </div>
   </div>
 </div>
@@ -2134,7 +2180,10 @@ async function cargarUsuarios() {
         <td style="font-size:12px;color:var(--muted)">${u.area||'—'}</td>
         <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${u.ultimo_acceso ? new Date(u.ultimo_acceso).toLocaleString('es-PE') : '—'}</td>
         <td>${u.activo ? '<span class="badge badge-green">Activo</span>' : '<span class="badge badge-red">Inactivo</span>'}</td>
-        <td>${u.id !== currentUser.id ? `<button class="btn btn-danger btn-sm" onclick="toggleUsuario(${u.id}, ${u.activo})">${u.activo?'Desactivar':'Activar'}</button>` : '<span style="font-size:11px;color:var(--muted)">Tú</span>'}</td>
+        <td style="white-space:nowrap">
+          <button class="btn btn-secondary btn-sm" onclick="abrirEditarUsuario(${u.id},'${u.username}','${u.nombre}','${u.rol}','${u.area||''}',${u.activo})">Editar</button>
+          ${u.id !== currentUser.id ? `<button class="btn btn-danger btn-sm" style="margin-left:4px" onclick="toggleUsuario(${u.id}, ${u.activo})">${u.activo?'Desactivar':'Activar'}</button>` : '<span style="font-size:11px;color:var(--muted);margin-left:8px">Tú</span>'}
+        </td>
       </tr>`).join('');
   } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
@@ -2179,6 +2228,61 @@ async function toggleUsuario(id, activo) {
   try { await sbPatch('panel_usuarios', id, { activo: !activo }); toast(`Usuario ${activo?'desactivado':'activado'}`); cargarUsuarios(); }
   catch(e) { toast('Error: ' + e.message, 'error'); }
 }
+
+let euId = null;
+
+function abrirEditarUsuario(id, username, nombre, rol, area, activo) {
+  euId = id;
+  document.getElementById('euUsername').value        = username;
+  document.getElementById('euNombre').value          = nombre;
+  document.getElementById('euRol').value             = rol;
+  document.getElementById('euArea').value            = area || '';
+  document.getElementById('euPassword').value        = '';
+  document.getElementById('euPasswordConfirm').value = '';
+  document.getElementById('euError').style.display  = 'none';
+  document.getElementById('modalEditarUsuarioTitle').textContent =
+    `Editar usuario: ${username}`;
+  abrirModal('modalEditarUsuario');
+}
+
+document.getElementById('btnGuardarEditarUsuario').addEventListener('click', async () => {
+  const nombre   = document.getElementById('euNombre').value.trim();
+  const rol      = document.getElementById('euRol').value;
+  const area     = document.getElementById('euArea').value.trim();
+  const pass     = document.getElementById('euPassword').value;
+  const passConf = document.getElementById('euPasswordConfirm').value;
+  const errEl    = document.getElementById('euError');
+  errEl.style.display = 'none';
+
+  if (!nombre) { errEl.textContent = 'El nombre es obligatorio'; errEl.style.display='block'; return; }
+  if (pass && pass !== passConf) {
+    errEl.textContent = 'Las contraseñas no coinciden';
+    errEl.style.display = 'block'; return;
+  }
+  if (pass && pass.length < 6) {
+    errEl.textContent = 'La contraseña debe tener al menos 6 caracteres';
+    errEl.style.display = 'block'; return;
+  }
+
+  const btn = document.getElementById('btnGuardarEditarUsuario');
+  btn.innerHTML = '<span class="spinner"></span>'; btn.disabled = true;
+
+  try {
+    const body = { nombre, rol, area: area || null };
+    if (pass) {
+      body.password_hash = await sha256(pass);
+    }
+    await sbPatch('panel_usuarios', euId, body);
+    toast('Usuario actualizado correctamente');
+    cerrarModal('modalEditarUsuario');
+    cargarUsuarios();
+  } catch(e) {
+    errEl.textContent = 'Error: ' + e.message;
+    errEl.style.display = 'block';
+  } finally {
+    btn.innerHTML = 'Guardar cambios'; btn.disabled = false;
+  }
+});
 
 // ═══════════════════════════════════════════════════════════════
 //  MÓDULO: FOTOS DE VERIFICACIÓN
