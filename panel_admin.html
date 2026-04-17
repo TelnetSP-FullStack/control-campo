@@ -1674,7 +1674,10 @@ async function cargarPermisos() {
         <td>${p.con_goce ? '<span class="badge badge-green">Con goce</span>' : '<span class="badge badge-amber">Sin goce</span>'}</td>
         <td>${badgePermiso(p.estado)}</td>
         <td style="white-space:nowrap">
-          ${p.estado === 'Pendiente' ? `<button class="btn btn-primary btn-sm" onclick="aprobarPermiso(${p.id})">Aprobar</button> <button class="btn btn-danger btn-sm" onclick="rechazarPermiso(${p.id})">Rechazar</button>` : `<button class="btn btn-secondary btn-sm" onclick="editarPermiso(${p.id})">Editar</button>`}
+          ${p.estado === 'Pendiente'
+            ? `<button class="btn btn-primary btn-sm" onclick="aprobarPermiso(${p.id})">Aprobar</button> <button class="btn btn-danger btn-sm" onclick="rechazarPermiso(${p.id})">Rechazar</button>`
+            : `<button class="btn btn-secondary btn-sm" onclick="editarPermiso(${p.id})">Editar</button> <button class="btn btn-danger btn-sm" onclick="eliminarPermiso(${p.id},'${((p.trabajadores?.nombres||'') + ' ' + (p.trabajadores?.apellido_paterno||'')).replace(/'/g,"\\'")}','${p.fecha_desde}','${p.fecha_hasta}')">Eliminar</button>`
+          }
         </td>
       </tr>`).join('') || `<tr><td colspan="8"><div class="empty-state"><div class="empty-ico">📝</div><p>No hay permisos</p></div></td></tr>`;
   } catch(e) { toast('Error: ' + e.message, 'error'); }
@@ -1706,7 +1709,37 @@ document.getElementById('btnNuevoPermiso').addEventListener('click', () => {
   abrirModal('modalPermiso');
 });
 
-function editarPermiso(id) { toast('Función de edición en desarrollo', 'error'); }
+async function editarPermiso(id) {
+  try {
+    const data = await sbGet('permisos',
+      `id=eq.${id}&select=*,trabajadores(nombres,apellido_paterno,dni)`);
+    if (!data.length) { toast('Permiso no encontrado', 'error'); return; }
+    const p = data[0];
+    editingId = id;
+    document.getElementById('modalPermisoTitle').textContent = 'Editar permiso / vacación';
+    await poblarSelectTrab();
+    document.getElementById('pTrabajador').value = p.trabajador_id;
+    document.getElementById('pTipo').value        = p.tipo;
+    document.getElementById('pDesde').value       = p.fecha_desde;
+    document.getElementById('pHasta').value       = p.fecha_hasta;
+    document.getElementById('pConGoce').value     = p.con_goce ? 'true' : 'false';
+    document.getElementById('pEstado').value      = p.estado;
+    document.getElementById('pObservacion').value = p.observacion || '';
+    abrirModal('modalPermiso');
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+
+async function eliminarPermiso(id, nombreTrab, fechaDesde, fechaHasta) {
+  if (currentUser?.rol === 'consulta') { toast('Sin permisos para esta acción', 'error'); return; }
+  const confirmMsg = `¿Eliminar el permiso de ${nombreTrab} (${fmtFecha(fechaDesde)} → ${fmtFecha(fechaHasta)})?\n\nEsto revertirá el período laboral automáticamente.`;
+  if (!confirm(confirmMsg)) return;
+  try {
+    await sbDelete('permisos', id);
+    toast('✓ Permiso eliminado — períodos laborales revertidos');
+    cargarPermisos();
+    verificarPermisosPendientes();
+  } catch(e) { toast('Error al eliminar: ' + e.message, 'error'); }
+}
 
 async function aprobarPermiso(id) {
   try { await sbPatch('permisos', id, { estado: 'Aprobado', aprobado_por: currentUser.nombre }); toast('Permiso aprobado'); cargarPermisos(); verificarPermisosPendientes(); }
@@ -1727,16 +1760,23 @@ document.getElementById('btnGuardarPermiso').addEventListener('click', async () 
   const btn = document.getElementById('btnGuardarPermiso');
   btn.innerHTML = '<span class="spinner"></span>'; btn.disabled = true;
   try {
-    await sbPost('permisos', {
+    const payload = {
       trabajador_id: parseInt(tid),
       tipo:          document.getElementById('pTipo').value,
-      fecha_desde:   des, fecha_hasta: has,
+      fecha_desde:   des,
+      fecha_hasta:   has,
       con_goce:      document.getElementById('pConGoce').value === 'true',
       estado:        document.getElementById('pEstado').value,
       observacion:   document.getElementById('pObservacion').value.trim() || null,
       aprobado_por:  currentUser.nombre,
-    });
-    toast('Permiso registrado');
+    };
+    if (editingId) {
+      await sbPatch('permisos', editingId, payload);
+      toast('✓ Permiso actualizado');
+    } else {
+      await sbPost('permisos', payload);
+      toast('✓ Permiso registrado');
+    }
     cerrarModal('modalPermiso');
     cargarPermisos();
     verificarPermisosPendientes();
