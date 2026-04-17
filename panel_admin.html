@@ -451,10 +451,10 @@ body.rol-jefe .nav-item[data-page="usuarios"] {
           </div>
           <table>
             <thead>
-              <tr><th>DNI</th><th>Trabajador</th><th>Fecha</th><th>Hora</th><th>Tipo</th><th>Fuente</th><th>Ubicación</th><th>Estado</th><th></th></tr>
+              <tr><th>DNI</th><th>Trabajador</th><th>Fecha</th><th>Hora</th><th>Tipo</th><th>Fuente</th><th>Ubicación</th><th style="text-align:center">GPS</th><th>Foto</th><th>Estado</th><th></th></tr>
             </thead>
             <tbody id="tbodyMarca">
-              <tr><td colspan="9"><div class="empty-state"><div class="empty-ico">⏳</div><p>Seleccione una fecha para filtrar</p></div></td></tr>
+              <tr><td colspan="11"><div class="empty-state"><div class="empty-ico">⏳</div><p>Seleccione una fecha para filtrar</p></div></td></tr>
             </tbody>
           </table>
         </div>
@@ -1806,7 +1806,7 @@ async function cargarMarcaciones() {
   const q     = document.getElementById('searchMarca').value.trim();
   if (!fecha && !q) return;
   try {
-    let params = 'select=*,trabajadores(nombres,apellido_paterno)&order=hora.asc&estado=eq.Activo';
+    let params = 'select=id,trabajador_id,bio_id,dni,fecha,hora,tipo,fuente,ubicacion,maps_url,foto_url,estado,trabajadores(nombres,apellido_paterno)&order=hora.asc&estado=eq.Activo';
     if (fecha) params += `&fecha=eq.${fecha}`;
     if (q)     params += `&dni=ilike.*${q}*`;
     const data = await sbGet('marcaciones', params);
@@ -1820,6 +1820,14 @@ async function cargarMarcaciones() {
         <td>${m.tipo === 'Entrada' ? '<span class="badge badge-green">Entrada</span>' : '<span class="badge badge-blue">Salida</span>'}</td>
         <td><span class="badge ${m.fuente==='Biometrico'?'badge-amber':'badge-teal'}">${m.fuente}</span></td>
         <td style="font-size:12px">${m.ubicacion||'—'}</td>
+        <td style="text-align:center">
+          ${m.maps_url
+            ? `<a href="${m.maps_url}" target="_blank"
+                title="Ver ubicación en Google Maps"
+                style="font-size:18px;text-decoration:none;cursor:pointer;">📍</a>`
+            : '<span style="color:var(--muted);font-size:11px">—</span>'
+          }
+        </td>
         <td>${m.foto_url ?
           `<img src="${m.foto_url}" onclick="verFoto('${m.foto_url}','${m.trabajadores ? m.trabajadores.nombres+' '+m.trabajadores.apellido_paterno : m.dni}','${m.fecha}','${m.hora}')"
             style="width:36px;height:36px;object-fit:cover;border-radius:6px;cursor:pointer;border:2px solid var(--accent);"
