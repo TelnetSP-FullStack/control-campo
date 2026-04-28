@@ -189,6 +189,95 @@ body.rol-jefe #btnExtraerBio,
 body.rol-jefe .nav-item[data-page="usuarios"] {
   display: none !important;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   SEGURIDAD — Indicador de sesión
+══════════════════════════════════════════════════════════════ */
+#sessionBar {
+  display:flex; align-items:center; gap:8px;
+  font-size:11px; font-family:var(--mono); color:var(--muted);
+}
+#sessionBar .sess-dot { width:7px; height:7px; border-radius:50%; background:var(--success); }
+#sessionBar.warn-idle .sess-dot { background:var(--warn); animation:blink .8s infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+/* ══════════════════════════════════════════════════════════════
+   RESPONSIVE MÓVIL
+══════════════════════════════════════════════════════════════ */
+#menuToggle {
+  display:none; background:none; border:none; color:var(--text);
+  font-size:20px; cursor:pointer; padding:4px 8px; line-height:1;
+}
+@media (max-width: 768px) {
+  #menuToggle { display:flex; align-items:center; }
+
+  /* Header compacto */
+  .hdr { padding:0 12px; height:48px; }
+  .hdr-logo { font-size:11px; letter-spacing:1px; }
+  .hdr-sep  { display:none; }
+  .hdr-module { display:none; }
+  #sessionBar { display:none; }
+  .user-name  { display:none; }
+
+  /* Sidebar como drawer */
+  .sidebar {
+    position:fixed; left:0; top:48px; bottom:0; z-index:200;
+    width:240px; transform:translateX(-100%);
+    transition:transform .25s ease; box-shadow:4px 0 20px rgba(0,0,0,.5);
+  }
+  .sidebar.open { transform:translateX(0); }
+  .sidebar-backdrop {
+    display:none; position:fixed; inset:0; top:48px;
+    background:rgba(0,0,0,.5); z-index:199;
+  }
+  .sidebar-backdrop.visible { display:block; }
+
+  /* Contenido principal */
+  .body { flex-direction:column; }
+  .main { padding:12px; overflow-x:hidden; }
+
+  /* Tablas horizontales con scroll */
+  .data-table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  table { min-width:600px; }
+
+  /* Login */
+  .login-box { width:calc(100vw - 32px); padding:32px 20px; }
+
+  /* Modales full-screen en móvil */
+  .modal-box {
+    width:calc(100vw - 16px) !important;
+    max-width:none !important;
+    max-height:90vh;
+    overflow-y:auto;
+    margin:8px;
+  }
+  .modal-overlay { align-items:flex-end; padding:0; }
+  .modal-box { border-radius:16px 16px 0 0; margin:0; width:100% !important; }
+
+  /* Cards de stats en columna */
+  .stats-grid { grid-template-columns:1fr 1fr !important; gap:8px !important; }
+
+  /* Botones más grandes para táctil */
+  .btn { padding:9px 14px; min-height:38px; }
+  .btn-sm { padding:7px 10px; min-height:34px; font-size:12px; }
+
+  /* Page header en columna */
+  .page-hdr { flex-direction:column; align-items:flex-start; gap:8px; }
+  .page-hdr > .btn { align-self:flex-start; }
+
+  /* Toolbar de tabla en columna */
+  .table-toolbar { flex-wrap:wrap; gap:8px; }
+  .search-box { min-width:0; flex:1 1 100%; }
+
+  /* Ocultar columnas menos críticas en tablas */
+  .col-hide-mobile { display:none !important; }
+}
+
+@media (max-width: 480px) {
+  .stats-grid { grid-template-columns:1fr 1fr !important; }
+  .hdr-right .role-badge { display:none; }
+}
+
 </style>
 </head>
 <body>
@@ -218,11 +307,16 @@ body.rol-jefe .nav-item[data-page="usuarios"] {
   <!-- Header -->
   <header class="hdr">
     <div class="hdr-left">
+      <button id="menuToggle" onclick="toggleSidebar()" aria-label="Menú">☰</button>
       <div class="hdr-logo">▸ TELNET SP</div>
       <div class="hdr-sep"></div>
       <div class="hdr-module" id="hdrModule">Panel de Administración</div>
     </div>
     <div class="hdr-right">
+    <div id="sessionBar">
+      <div class="sess-dot"></div>
+      <span id="sessionCountdown"></span>
+    </div>
       <div class="user-pill">
         <div class="user-avatar" id="userAvatar">A</div>
         <span class="user-name" id="userName">admin</span>
@@ -232,7 +326,8 @@ body.rol-jefe .nav-item[data-page="usuarios"] {
     </div>
   </header>
 
-  <div class="body">
+  <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar()"></div>
+<div class="body">
     <!-- Sidebar -->
     <nav class="sidebar">
       <div class="nav-section">Principal</div>
@@ -664,18 +759,60 @@ body.rol-jefe .nav-item[data-page="usuarios"] {
       <!-- ── PÁGINA: USUARIOS PANEL ─────────────────────────── -->
       <div class="page" id="page-usuarios">
         <div class="page-hdr">
-          <div><div class="page-title">Usuarios del panel</div><div class="page-sub">Gestión de accesos de administración</div></div>
+          <div><div class="page-title">Usuarios del panel</div><div class="page-sub">Gestión de accesos y log de auditoría</div></div>
           <button class="btn btn-primary" id="btnNuevoUsuario">+ Nuevo usuario</button>
         </div>
-        <div class="data-table-wrap">
-          <table>
-            <thead>
-              <tr><th>Usuario</th><th>Nombre</th><th>Rol</th><th>Área</th><th>Último acceso</th><th>Estado</th><th></th></tr>
-            </thead>
-            <tbody id="tbodyUsuarios">
-              <tr><td colspan="7"><div class="empty-state"><div class="empty-ico">⏳</div><p>Cargando…</p></div></td></tr>
-            </tbody>
-          </table>
+
+        <!-- Tabs usuarios / auditoría -->
+        <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px">
+          <button id="tabUsuariosBtn" onclick="switchUsrTab('usuarios')"
+            style="background:none;border:none;border-bottom:2px solid var(--accent);color:var(--accent);font-family:var(--mono);font-size:12px;padding:8px 18px;cursor:pointer;letter-spacing:.5px">
+            🔐 Usuarios
+          </button>
+          <button id="tabAuditoriaBtn" onclick="switchUsrTab('auditoria')"
+            style="background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-family:var(--mono);font-size:12px;padding:8px 18px;cursor:pointer;letter-spacing:.5px">
+            📋 Auditoría
+          </button>
+        </div>
+
+        <!-- Panel usuarios -->
+        <div id="panelUsuarios">
+          <div class="data-table-wrap">
+            <table>
+              <thead>
+                <tr><th>Usuario</th><th>Nombre</th><th>Rol</th><th class="col-hide-mobile">Área</th><th class="col-hide-mobile">Último acceso</th><th>Estado</th><th></th></tr>
+              </thead>
+              <tbody id="tbodyUsuarios">
+                <tr><td colspan="7"><div class="empty-state"><div class="empty-ico">⏳</div><p>Cargando…</p></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Panel auditoría -->
+        <div id="panelAuditoria" style="display:none">
+          <div class="table-toolbar" style="margin-bottom:12px">
+            <input type="text" id="filtroAudUser" class="search-box" placeholder="Filtrar por usuario…" style="max-width:220px">
+            <select id="filtroAudModulo" class="search-box" style="max-width:180px">
+              <option value="">Todos los módulos</option>
+              <option value="sistema">sistema</option>
+              <option value="permisos">permisos</option>
+              <option value="marcaciones">marcaciones</option>
+              <option value="usuarios">usuarios</option>
+              <option value="trabajadores">trabajadores</option>
+            </select>
+            <button class="btn btn-secondary" id="btnCargarAuditoria" onclick="cargarAuditoria()">Cargar log</button>
+          </div>
+          <div class="data-table-wrap">
+            <table>
+              <thead>
+                <tr><th>Fecha/hora</th><th>Usuario</th><th>Módulo</th><th>Acción</th><th class="col-hide-mobile">Detalle</th></tr>
+              </thead>
+              <tbody id="tbodyAuditoria">
+                <tr><td colspan="5" style="text-align:center;padding:32px;color:var(--muted)">Seleccione filtros y presione Cargar log</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -1074,15 +1211,33 @@ body.rol-jefe .nav-item[data-page="usuarios"] {
 
 <script>
 // ── CONFIGURACIÓN ─────────────────────────────────────────────
-const SB_URL  = 'https://ajubapgkgadrthwcgjci.supabase.co';
-const SB_ANON = 'sb_publishable_9eetAavOoo7gVnzQu7vndA_CTuoywNK';
+// Credenciales ensambladas en runtime (dificulta scraping automático)
+const _cfg = (() => {
+  const h = 'ajubapgkgadrthwcgjci';
+  const d = '.supabase.co';
+  const p = ['sb_publishable_9eetA','avOoo7gVnzQu7vndA_C','TuoywNK'];
+  return { u: `https://${h}${d}`, k: p.join('') };
+})();
+const SB_URL  = _cfg.u;
+const SB_ANON = _cfg.k;
 const HEADERS = { 'apikey': SB_ANON, 'Authorization': 'Bearer ' + SB_ANON, 'Content-Type': 'application/json', 'Prefer': 'return=representation' };
 
+// ── Configuración de seguridad ────────────────────────────────
+const SEC = {
+  SESSION_TIMEOUT_MS : 4 * 60 * 60 * 1000,  // 4 horas de sesión máxima
+  IDLE_TIMEOUT_MS    : 30 * 60 * 1000,       // 30 min de inactividad → logout
+  MAX_LOGIN_ATTEMPTS : 5,                     // intentos fallidos antes de bloqueo
+  LOCKOUT_MIN        : 15,                    // minutos de bloqueo
+};
+
 // ── Estado global ─────────────────────────────────────────────
-let currentUser = null;
-let editingId   = null;
-let allTrab     = [];
-let allHorarios = [];
+let currentUser   = null;
+let editingId     = null;
+let allTrab       = [];
+let allHorarios   = [];
+let _sessionTimer = null;
+let _idleTimer    = null;
+let _lastActivity = Date.now();
 
 // ── API helpers ───────────────────────────────────────────────
 async function sbGet(table, params = '') {
@@ -1119,25 +1274,137 @@ async function sha256(msg) {
   return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2,'0')).join('');
 }
 
-// ── Login ─────────────────────────────────────────────────────
+// ── Auditoría ─────────────────────────────────────────────────
+async function auditLog(accion, modulo, detalle = {}) {
+  if (!currentUser) return;
+  try {
+    await fetch(`${SB_URL}/rest/v1/panel_auditoria`, {
+      method: 'POST',
+      headers: { ...HEADERS, 'Prefer': 'return=minimal' },
+      body: JSON.stringify({
+        usuario_id : currentUser.id,
+        username   : currentUser.username,
+        rol        : currentUser.rol,
+        accion, modulo,
+        detalle    : detalle,
+        user_agent : navigator.userAgent.slice(0, 200),
+      })
+    });
+  } catch(e) { console.warn('Audit log error:', e.message); }
+}
+
+// ── Gestión de sesión ─────────────────────────────────────────
+function resetIdleTimer() {
+  _lastActivity = Date.now();
+  clearTimeout(_idleTimer);
+  _idleTimer = setTimeout(() => {
+    if (currentUser) {
+      toast('Sesión cerrada por inactividad (30 min)', 'error');
+      auditLog('SESSION_IDLE_LOGOUT', 'sistema').finally(cerrarSesion);
+    }
+  }, SEC.IDLE_TIMEOUT_MS);
+}
+
+function iniciarTimersSesion() {
+  resetIdleTimer();
+  // Detectar actividad del usuario
+  ['click','keydown','mousemove','touchstart','scroll'].forEach(ev =>
+    document.addEventListener(ev, resetIdleTimer, { passive: true })
+  );
+  // Timer absoluto de sesión (4 horas)
+  clearTimeout(_sessionTimer);
+  _sessionTimer = setTimeout(() => {
+    toast('Sesión expirada (4 horas). Por favor vuelva a ingresar.', 'error');
+    auditLog('SESSION_EXPIRED', 'sistema').finally(cerrarSesion);
+  }, SEC.SESSION_TIMEOUT_MS);
+}
+
+function cerrarSesion() {
+  clearTimeout(_idleTimer);
+  clearTimeout(_sessionTimer);
+  ['click','keydown','mousemove','touchstart','scroll'].forEach(ev =>
+    document.removeEventListener(ev, resetIdleTimer)
+  );
+  currentUser = null;
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('app').classList.remove('visible');
+  document.getElementById('loginUser').value = '';
+  document.getElementById('loginPass').value = '';
+  document.getElementById('loginError').style.display = 'none';
+  document.getElementById('loginError').textContent = 'Usuario o contraseña incorrectos';
+}
+
+// ── Login con bloqueo por intentos fallidos ───────────────────
+async function verificarBloqueo(username) {
+  const hace15 = new Date(Date.now() - SEC.LOCKOUT_MIN * 60 * 1000).toISOString();
+  try {
+    const res = await fetch(
+      `${SB_URL}/rest/v1/panel_login_intentos?username=eq.${encodeURIComponent(username)}&creado_en=gte.${hace15}&select=id`,
+      { headers: HEADERS }
+    );
+    const data = await res.json();
+    return Array.isArray(data) ? data.length : 0;
+  } catch { return 0; }
+}
+
+async function registrarIntentoFallido(username) {
+  try {
+    await fetch(`${SB_URL}/rest/v1/panel_login_intentos`, {
+      method: 'POST',
+      headers: { ...HEADERS, 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ username })
+    });
+  } catch(e) { console.warn('No se pudo registrar intento:', e.message); }
+}
+
+async function limpiarIntentos(username) {
+  try {
+    await fetch(`${SB_URL}/rest/v1/panel_login_intentos?username=eq.${encodeURIComponent(username)}`,
+      { method: 'DELETE', headers: HEADERS });
+  } catch(e) { console.warn('No se pudo limpiar intentos:', e.message); }
+}
+
 document.getElementById('btnLogin').addEventListener('click', async () => {
   const user = document.getElementById('loginUser').value.trim();
   const pass = document.getElementById('loginPass').value;
+  const errEl = document.getElementById('loginError');
   if (!user || !pass) return;
+
   const btn = document.getElementById('btnLogin');
   btn.innerHTML = '<span class="spinner"></span> Verificando…';
   btn.disabled = true;
+  errEl.style.display = 'none';
+
   try {
-    const hash = await sha256(pass);
-    const res  = await sbGet('panel_usuarios', `username=eq.${encodeURIComponent(user)}&password_hash=eq.${hash}&activo=eq.true&select=*`);
-    if (!res.length) {
-      document.getElementById('loginError').style.display = 'block';
-    } else {
-      currentUser = res[0];
-      // Actualizar ultimo_acceso
-      await sbPatch('panel_usuarios', currentUser.id, { ultimo_acceso: new Date().toISOString() });
-      iniciarApp();
+    // Verificar bloqueo por intentos fallidos
+    const intentos = await verificarBloqueo(user);
+    if (intentos >= SEC.MAX_LOGIN_ATTEMPTS) {
+      errEl.textContent = `Cuenta bloqueada por ${SEC.LOCKOUT_MIN} min. Demasiados intentos fallidos.`;
+      errEl.style.display = 'block';
+      return;
     }
+
+    const hash = await sha256(pass);
+    const res  = await sbGet('panel_usuarios',
+      `username=eq.${encodeURIComponent(user)}&activo=eq.true&select=*`);
+
+    if (!res.length || res[0].password_hash !== hash) {
+      await registrarIntentoFallido(user);
+      const restantes = SEC.MAX_LOGIN_ATTEMPTS - intentos - 1;
+      errEl.textContent = restantes > 0
+        ? `Usuario o contraseña incorrectos. Intentos restantes: ${restantes}`
+        : `Cuenta bloqueada por ${SEC.LOCKOUT_MIN} minutos.`;
+      errEl.style.display = 'block';
+      return;
+    }
+
+    // Login exitoso
+    await limpiarIntentos(user);
+    currentUser = res[0];
+    await sbPatch('panel_usuarios', currentUser.id, { ultimo_acceso: new Date().toISOString() });
+    await auditLog('LOGIN', 'sistema', { ip_hint: 'client' });
+    iniciarApp();
+
   } catch(e) {
     toast('Error de conexión: ' + e.message, 'error');
   } finally {
@@ -1153,7 +1420,7 @@ document.getElementById('loginPass').addEventListener('keydown', e => {
 function iniciarApp() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').classList.add('visible');
-  const ini = currentUser.nombre.split(' ').map(w => w[0]).join('').slice(0,2);
+  const ini = currentUser.nombre.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
   document.getElementById('userAvatar').textContent = ini;
   document.getElementById('userName').textContent   = currentUser.username;
   const rb = document.getElementById('roleBadge');
@@ -1166,12 +1433,19 @@ function iniciarApp() {
   if (currentUser.rol === 'jefe_area')  document.body.classList.add('rol-jefe');
   if (currentUser.rol === 'consulta')   document.body.classList.add('rol-consulta');
 
+  // Ocultar sección Usuarios para roles que no sean admin
+  const navUsuarios = document.querySelector('[data-page="usuarios"]');
+  if (navUsuarios) navUsuarios.style.display = currentUser.rol === 'admin' ? '' : 'none';
+
   // Bloquear apertura de modales para rol consulta
   if (currentUser.rol === 'consulta') {
     document.querySelectorAll('.modal-overlay').forEach(m => {
       m.addEventListener('click', e => e.stopPropagation());
     });
   }
+
+  // Iniciar timers de sesión y heartbeat de auditoría
+  iniciarTimersSesion();
 
   cargarTrabajadores();
   cargarHorarios();
@@ -1180,13 +1454,9 @@ function iniciarApp() {
   cargarAlertasIncompletas();
 }
 
-document.getElementById('btnLogout').addEventListener('click', () => {
-  currentUser = null;
-  document.getElementById('login-screen').style.display = 'flex';
-  document.getElementById('app').classList.remove('visible');
-  document.getElementById('loginUser').value = '';
-  document.getElementById('loginPass').value = '';
-  document.getElementById('loginError').style.display = 'none';
+document.getElementById('btnLogout').addEventListener('click', async () => {
+  await auditLog('LOGOUT', 'sistema');
+  cerrarSesion();
 });
 
 // ── Navegación ────────────────────────────────────────────────
@@ -1676,7 +1946,7 @@ async function cargarPermisos() {
         <td style="white-space:nowrap">
           ${p.estado === 'Pendiente'
             ? `<button class="btn btn-primary btn-sm" onclick="aprobarPermiso(${p.id})">Aprobar</button> <button class="btn btn-danger btn-sm" onclick="rechazarPermiso(${p.id})">Rechazar</button>`
-            : `<button class="btn btn-secondary btn-sm" onclick="editarPermiso(${p.id})">Editar</button> <button class="btn btn-danger btn-sm" onclick="eliminarPermiso(${p.id},'${((p.trabajadores?.nombres||'') + ' ' + (p.trabajadores?.apellido_paterno||'')).replace(/'/g,"\\'")}','${p.fecha_desde}','${p.fecha_hasta}')">Eliminar</button>`
+            : `<button class="btn btn-secondary btn-sm" onclick="editarPermiso(${p.id})">Editar</button> <button class="btn btn-danger btn-sm" style="margin-left:4px" onclick="eliminarPermiso(${p.id},'${((p.trabajadores?.nombres||'')+' '+(p.trabajadores?.apellido_paterno||'')).replace(/'/g,"\\'")}','${p.fecha_desde}','${p.fecha_hasta}')">Eliminar</button>`
           }
         </td>
       </tr>`).join('') || `<tr><td colspan="8"><div class="empty-state"><div class="empty-ico">📝</div><p>No hay permisos</p></div></td></tr>`;
@@ -1709,46 +1979,21 @@ document.getElementById('btnNuevoPermiso').addEventListener('click', () => {
   abrirModal('modalPermiso');
 });
 
-async function editarPermiso(id) {
-  try {
-    const data = await sbGet('permisos',
-      `id=eq.${id}&select=*,trabajadores(nombres,apellido_paterno,dni)`);
-    if (!data.length) { toast('Permiso no encontrado', 'error'); return; }
-    const p = data[0];
-    editingId = id;
-    document.getElementById('modalPermisoTitle').textContent = 'Editar permiso / vacación';
-    await poblarSelectTrab();
-    document.getElementById('pTrabajador').value = p.trabajador_id;
-    document.getElementById('pTipo').value        = p.tipo;
-    document.getElementById('pDesde').value       = p.fecha_desde;
-    document.getElementById('pHasta').value       = p.fecha_hasta;
-    document.getElementById('pConGoce').value     = p.con_goce ? 'true' : 'false';
-    document.getElementById('pEstado').value      = p.estado;
-    document.getElementById('pObservacion').value = p.observacion || '';
-    abrirModal('modalPermiso');
-  } catch(e) { toast('Error: ' + e.message, 'error'); }
-}
-
-async function eliminarPermiso(id, nombreTrab, fechaDesde, fechaHasta) {
-  if (currentUser?.rol === 'consulta') { toast('Sin permisos para esta acción', 'error'); return; }
-  const confirmMsg = `¿Eliminar el permiso de ${nombreTrab} (${fmtFecha(fechaDesde)} → ${fmtFecha(fechaHasta)})?\n\nEsto revertirá el período laboral automáticamente.`;
-  if (!confirm(confirmMsg)) return;
-  try {
-    await sbDelete('permisos', id);
-    toast('✓ Permiso eliminado — períodos laborales revertidos');
-    cargarPermisos();
-    verificarPermisosPendientes();
-  } catch(e) { toast('Error al eliminar: ' + e.message, 'error'); }
-}
 
 async function aprobarPermiso(id) {
-  try { await sbPatch('permisos', id, { estado: 'Aprobado', aprobado_por: currentUser.nombre }); toast('Permiso aprobado'); cargarPermisos(); verificarPermisosPendientes(); }
-  catch(e) { toast('Error: ' + e.message, 'error'); }
+  try {
+    await sbPatch('permisos', id, { estado: 'Aprobado', aprobado_por: currentUser.nombre });
+    await auditLog('PERMISO_APROBADO', 'permisos', { permiso_id: id });
+    toast('Permiso aprobado'); cargarPermisos(); verificarPermisosPendientes();
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
 async function rechazarPermiso(id) {
   if (!confirm('¿Rechazar este permiso?')) return;
-  try { await sbPatch('permisos', id, { estado: 'Rechazado' }); toast('Permiso rechazado'); cargarPermisos(); verificarPermisosPendientes(); }
-  catch(e) { toast('Error: ' + e.message, 'error'); }
+  try {
+    await sbPatch('permisos', id, { estado: 'Rechazado' });
+    await auditLog('PERMISO_RECHAZADO', 'permisos', { permiso_id: id });
+    toast('Permiso rechazado'); cargarPermisos(); verificarPermisosPendientes();
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
 
 document.getElementById('btnGuardarPermiso').addEventListener('click', async () => {
@@ -1763,8 +2008,7 @@ document.getElementById('btnGuardarPermiso').addEventListener('click', async () 
     const payload = {
       trabajador_id: parseInt(tid),
       tipo:          document.getElementById('pTipo').value,
-      fecha_desde:   des,
-      fecha_hasta:   has,
+      fecha_desde:   des, fecha_hasta: has,
       con_goce:      document.getElementById('pConGoce').value === 'true',
       estado:        document.getElementById('pEstado').value,
       observacion:   document.getElementById('pObservacion').value.trim() || null,
@@ -1772,9 +2016,11 @@ document.getElementById('btnGuardarPermiso').addEventListener('click', async () 
     };
     if (editingId) {
       await sbPatch('permisos', editingId, payload);
+      await auditLog('PERMISO_EDITADO', 'permisos', { permiso_id: editingId });
       toast('✓ Permiso actualizado');
     } else {
       await sbPost('permisos', payload);
+      await auditLog('PERMISO_CREADO', 'permisos', { trabajador_id: parseInt(tid), desde: des, hasta: has });
       toast('✓ Permiso registrado');
     }
     cerrarModal('modalPermiso');
@@ -1891,6 +2137,7 @@ async function anularMarcacion(id) {
   if (motivo === null) return;
   try {
     await sbPatch('marcaciones', id, { estado: 'Anulado', motivo_anulacion: motivo, anulado_por: currentUser.nombre, anulado_en: new Date().toISOString() });
+    await auditLog('MARCACION_ANULADA', 'marcaciones', { marcacion_id: id, motivo });
     toast('Marcación anulada. El período laboral se recalculará.');
     cargarMarcaciones();
   } catch(e) { toast('Error: ' + e.message, 'error'); }
@@ -2273,8 +2520,11 @@ document.getElementById('btnGuardarUsuario').addEventListener('click', async () 
 });
 
 async function toggleUsuario(id, activo) {
-  try { await sbPatch('panel_usuarios', id, { activo: !activo }); toast(`Usuario ${activo?'desactivado':'activado'}`); cargarUsuarios(); }
-  catch(e) { toast('Error: ' + e.message, 'error'); }
+  try {
+    await sbPatch('panel_usuarios', id, { activo: !activo });
+    await auditLog(activo ? 'USUARIO_DESACTIVADO' : 'USUARIO_ACTIVADO', 'usuarios', { usuario_id: id });
+    toast(`Usuario ${activo?'desactivado':'activado'}`); cargarUsuarios();
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
 
 let euId = null;
@@ -2578,41 +2828,31 @@ async function cargarAlertasIncompletas() {
       const cntEl = document.getElementById('cntIncompletas');
       if (cntEl) cntEl.textContent = data.length;
 
-      document.getElementById('tbodyIncompletas').innerHTML = data.map(r => {
-        const esSinEntrada = r.estado_dia === 'Sin entrada';
-        const marcaDisplay = fmtHora(r.ultima_marcacion);
-        const badgeMarca   = r.tipo_ultima_marcacion
-          ? `<span class="badge ${r.tipo_ultima_marcacion==='Entrada'?'badge-green':'badge-blue'}" style="margin-left:4px;font-size:10px">${r.tipo_ultima_marcacion}</span>`
-          : '<span style="color:var(--muted);font-size:11px">—</span>';
-        const accion = esSinEntrada
-          ? `<button class="btn btn-secondary btn-sm"
-               onclick="abrirEntradaManual('${r.trabajador_id}','${r.nombre_completo}','${r.dni}','${r.fecha}','${r.ultima_salida||''}','${r.ubicacion_ultima||'Oficina Principal'}')">
-               ↑ Entrada manual
-             </button>`
-          : `<button class="btn btn-secondary btn-sm"
-               onclick="abrirSalidaManual('${r.trabajador_id}','${r.nombre_completo}','${r.dni}','${r.fecha}','${r.primera_entrada||''}','${r.ubicacion_ultima||'Oficina Principal'}')">
-               ↓ Salida manual
-             </button>`;
-        return `
+      document.getElementById('tbodyIncompletas').innerHTML = data.map(r => `
         <tr style="border-top:1px solid rgba(48,54,61,0.5)">
           <td style="padding:6px 8px">
             <strong>${r.nombre_completo}</strong>
             <span style="color:var(--muted);font-size:11px;margin-left:6px">${r.dni}</span>
           </td>
           <td style="padding:6px 8px;font-family:var(--mono)">${fmtFecha(r.fecha)}</td>
-          <td style="padding:6px 8px;font-family:var(--mono);color:${esSinEntrada?'var(--muted)':'var(--success)'}">
-            ${esSinEntrada ? '<span style="color:var(--muted);font-size:11px">Sin entrada</span>' : fmtHora(r.primera_entrada)}
-          </td>
+          <td style="padding:6px 8px;font-family:var(--mono);color:var(--success)">${fmtHora(r.primera_entrada)}</td>
           <td style="padding:6px 8px;font-family:var(--mono)">
-            ${marcaDisplay} ${badgeMarca}
+            ${fmtHora(r.ultima_marcacion)}
+            <span class="badge ${r.tipo_ultima_marcacion==='Entrada'?'badge-green':'badge-blue'}" style="margin-left:4px;font-size:10px">
+              ${r.tipo_ultima_marcacion||'—'}
+            </span>
             <span style="color:var(--muted);font-size:10px;margin-left:4px">${r.ubicacion_ultima||''}</span>
           </td>
           <td style="padding:6px 8px">
-            <span class="badge ${esSinEntrada?'badge-blue':'badge-amber'}">${r.estado_dia}</span>
+            <span class="badge badge-amber">${r.estado_dia}</span>
           </td>
-          <td style="padding:6px 8px;white-space:nowrap">${accion}</td>
-        </tr>`;
-      }).join('');
+          <td style="padding:6px 8px;white-space:nowrap">
+            <button class="btn btn-secondary btn-sm"
+              onclick="abrirSalidaManual('${r.trabajador_id}','${r.nombre_completo}','${r.dni}','${r.fecha}','${r.primera_entrada||''}','${r.ubicacion_ultima||'Oficina Principal'}')">
+              ↓ Salida manual
+            </button>
+          </td>
+        </tr>`).join('');
     } else {
       if (badge) badge.style.display = 'none';
       const panelAlert = document.getElementById('alertasIncompletas');
@@ -2653,49 +2893,6 @@ function abrirSalidaManual(trabId, nombre, dni, fecha, primeraEntrada, ubicacion
     document.getElementById('smHora').value = '18:00';
   }
 
-  // Restaurar modo salida (por si se usó antes como entrada)
-  document.getElementById('modalSalidaManual').dataset.modo = 'salida';
-  document.querySelector('#modalSalidaManual .modal-title').textContent = 'Registrar salida manual';
-  document.getElementById('btnGuardarSalidaManual').textContent = 'Registrar salida';
-  abrirModal('modalSalidaManual');
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  ENTRADA MANUAL desde alertas (caso: solo hay salida registrada)
-// ═══════════════════════════════════════════════════════════════
-let emTrabajadorId = null;
-let emFecha        = null;
-let emDni          = null;
-
-function abrirEntradaManual(trabId, nombre, dni, fecha, ultimaSalida, ubicacion) {
-  emTrabajadorId = trabId;
-  emFecha        = fecha;
-  emDni          = dni;
-
-  // Reusar el modal de salida manual pero adaptado para entrada
-  document.getElementById('smInfoTrab').textContent  = nombre + ' — DNI: ' + dni;
-  document.getElementById('smInfoFecha').textContent = 'Fecha: ' + fmtFecha(fecha) +
-    (ultimaSalida ? '  |  Salida registrada: ' + fmtHora(ultimaSalida) : '');
-  document.getElementById('smUbicacion').value = ubicacion || 'Oficina Principal';
-  document.getElementById('smMotivo').value    = '';
-  document.getElementById('smError').style.display = 'none';
-
-  // Cambiar título y label del botón
-  document.querySelector('#modalSalidaManual .modal-title').textContent = 'Registrar entrada manual';
-  document.getElementById('btnGuardarSalidaManual').textContent = 'Registrar entrada';
-
-  // Hora sugerida: hora de inicio de jornada por defecto
-  const hoy = new Date().toISOString().slice(0,10);
-  if (fecha === hoy) {
-    const now = new Date();
-    document.getElementById('smHora').value =
-      String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
-  } else {
-    document.getElementById('smHora').value = '08:00';
-  }
-
-  // Marcar modo entrada
-  document.getElementById('modalSalidaManual').dataset.modo = 'entrada';
   abrirModal('modalSalidaManual');
 }
 
@@ -2706,21 +2903,9 @@ document.getElementById('btnGuardarSalidaManual').addEventListener('click', asyn
   const errEl     = document.getElementById('smError');
   errEl.style.display = 'none';
 
-  // Detectar modo: entrada o salida
-  const modo       = document.getElementById('modalSalidaManual').dataset.modo || 'salida';
-  const esModoEntr = modo === 'entrada';
-  const trabId     = esModoEntr ? emTrabajadorId : smTrabajadorId;
-  const fecha      = esModoEntr ? emFecha        : smFecha;
-  const dni        = esModoEntr ? emDni          : smDni;
-  const tipoMarca  = esModoEntr ? 'Entrada'      : 'Salida';
-
-  if (!hora) {
-    errEl.textContent = `Ingrese la hora de ${esModoEntr ? 'entrada' : 'salida'}`;
-    errEl.style.display = 'block'; return;
-  }
-  if (!trabId || !fecha || !dni) {
-    errEl.textContent = 'Error: datos del trabajador no disponibles';
-    errEl.style.display = 'block'; return;
+  if (!hora) { errEl.textContent = 'Ingrese la hora de salida'; errEl.style.display='block'; return; }
+  if (!smTrabajadorId || !smFecha || !smDni) {
+    errEl.textContent = 'Error: datos del trabajador no disponibles'; errEl.style.display='block'; return;
   }
 
   const btn = document.getElementById('btnGuardarSalidaManual');
@@ -2728,32 +2913,29 @@ document.getElementById('btnGuardarSalidaManual').addEventListener('click', asyn
   btn.disabled  = true;
 
   try {
+    // Insertar marcación de salida manual
     const { error } = await fetch(`${SB_URL}/rest/v1/marcaciones`, {
       method:  'POST',
       headers: { ...HEADERS, 'Prefer': 'return=minimal' },
       body: JSON.stringify({
-        trabajador_id : parseInt(trabId),
-        dni           : dni,
-        fecha         : fecha,
+        trabajador_id : parseInt(smTrabajadorId),
+        dni           : smDni,
+        fecha         : smFecha,
         hora          : hora + ':00',
-        tipo          : tipoMarca,
+        tipo          : 'Salida',
         fuente        : 'Manual',
         ubicacion     : ubicacion || 'Oficina Principal',
         estado        : 'Activo',
-        timestamp_iso : new Date(`${fecha}T${hora}:00`).toISOString(),
+        timestamp_iso : new Date(`${smFecha}T${hora}:00`).toISOString(),
       })
     }).then(async r => ({ ok: r.ok, error: r.ok ? null : await r.text() }));
 
     if (error) throw new Error(error);
 
-    toast(`✓ ${tipoMarca} manual registrada — ${fmtFecha(fecha)} ${hora}${motivo ? ' — ' + motivo : ''}`);
-
-    // Restaurar títulos del modal para próximo uso como salida
-    document.querySelector('#modalSalidaManual .modal-title').textContent = 'Registrar salida manual';
-    document.getElementById('btnGuardarSalidaManual').textContent = 'Registrar salida';
-    document.getElementById('modalSalidaManual').dataset.modo = 'salida';
-
+    toast(`✓ Salida manual registrada — ${fmtFecha(smFecha)} ${hora}${motivo ? ' — ' + motivo : ''}`);
     cerrarModal('modalSalidaManual');
+
+    // Recargar alertas y marcaciones
     setTimeout(() => {
       cargarAlertasIncompletas();
       cargarMarcaciones();
@@ -2763,7 +2945,7 @@ document.getElementById('btnGuardarSalidaManual').addEventListener('click', asyn
     errEl.textContent = 'Error al registrar: ' + e.message;
     errEl.style.display = 'block';
   } finally {
-    btn.innerHTML = esModoEntr ? 'Registrar entrada' : 'Registrar salida';
+    btn.innerHTML = 'Registrar salida';
     btn.disabled  = false;
   }
 });
@@ -2851,6 +3033,134 @@ const _origCargarMarcaciones = window.cargarMarcaciones;
 document.querySelector('[data-page="marcaciones"]').addEventListener('click', () => {
   setTimeout(verificarAgente, 500);
 });
+
+// ═══════════════════════════════════════════════════════════════
+//  SIDEBAR MÓVIL
+// ═══════════════════════════════════════════════════════════════
+function toggleSidebar() {
+  const sb  = document.querySelector('.sidebar');
+  const bd  = document.getElementById('sidebarBackdrop');
+  const isOpen = sb.classList.toggle('open');
+  bd.classList.toggle('visible', isOpen);
+}
+
+// Cerrar sidebar al hacer click en un ítem de navegación (móvil)
+document.querySelectorAll('.nav-item[data-page]').forEach(item => {
+  item.addEventListener('click', () => {
+    if (window.innerWidth <= 768) {
+      document.querySelector('.sidebar').classList.remove('open');
+      document.getElementById('sidebarBackdrop').classList.remove('visible');
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  COUNTDOWN DE SESIÓN en el header
+// ═══════════════════════════════════════════════════════════════
+(function initSessionCountdown() {
+  setInterval(() => {
+    if (!currentUser) return;
+    const idle  = Date.now() - _lastActivity;
+    const left  = SEC.IDLE_TIMEOUT_MS - idle;
+    const bar   = document.getElementById('sessionBar');
+    const cnt   = document.getElementById('sessionCountdown');
+    if (!bar || !cnt) return;
+    if (left <= 5 * 60 * 1000) {
+      const m = Math.floor(left / 60000);
+      const s = Math.floor((left % 60000) / 1000);
+      cnt.textContent = `Sesión expira en ${m}:${String(s).padStart(2,'0')}`;
+      bar.classList.add('warn-idle');
+    } else {
+      const totalLeft = SEC.SESSION_TIMEOUT_MS - (Date.now() - _lastActivity);
+      const hh = Math.floor(totalLeft / 3600000);
+      const mm = Math.floor((totalLeft % 3600000) / 60000);
+      cnt.textContent = `Sesión: ${hh}h ${mm}m`;
+      bar.classList.remove('warn-idle');
+    }
+  }, 10000);
+})();
+
+// ═══════════════════════════════════════════════════════════════
+//  PERMISOS — Editar y Eliminar (con auditoría)
+// ═══════════════════════════════════════════════════════════════
+async function editarPermiso(id) {
+  try {
+    const data = await sbGet('permisos',
+      `id=eq.${id}&select=*,trabajadores(nombres,apellido_paterno,dni)`);
+    if (!data.length) { toast('Permiso no encontrado', 'error'); return; }
+    const p = data[0];
+    editingId = id;
+    document.getElementById('modalPermisoTitle').textContent = 'Editar permiso / vacación';
+    await poblarSelectTrab();
+    document.getElementById('pTrabajador').value = p.trabajador_id;
+    document.getElementById('pTipo').value        = p.tipo;
+    document.getElementById('pDesde').value       = p.fecha_desde;
+    document.getElementById('pHasta').value       = p.fecha_hasta;
+    document.getElementById('pConGoce').value     = p.con_goce ? 'true' : 'false';
+    document.getElementById('pEstado').value      = p.estado;
+    document.getElementById('pObservacion').value = p.observacion || '';
+    abrirModal('modalPermiso');
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+
+async function eliminarPermiso(id, nombreTrab, fechaDesde, fechaHasta) {
+  if (currentUser?.rol === 'consulta') { toast('Sin permisos para esta acción', 'error'); return; }
+  const confirmMsg = `¿Eliminar el permiso de ${nombreTrab} (${fmtFecha(fechaDesde)} → ${fmtFecha(fechaHasta)})?\n\nEsto revertirá el período laboral automáticamente.`;
+  if (!confirm(confirmMsg)) return;
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/permisos?id=eq.${id}`,
+      { method: 'DELETE', headers: HEADERS });
+    if (!r.ok) throw new Error(await r.text());
+    await auditLog('PERMISO_ELIMINADO', 'permisos', { permiso_id: id, trabajador: nombreTrab, desde: fechaDesde, hasta: fechaHasta });
+    toast('✓ Permiso eliminado — períodos laborales revertidos');
+    cargarPermisos();
+    verificarPermisosPendientes();
+  } catch(e) { toast('Error al eliminar: ' + e.message, 'error'); }
+}
+
+// ── Sección Auditoría en panel Usuarios ──────────────────────
+async function cargarAuditoria() {
+  const filtroUser = document.getElementById('filtroAudUser')?.value?.trim() || '';
+  const filtroMod  = document.getElementById('filtroAudModulo')?.value || '';
+  const btn = document.getElementById('btnCargarAuditoria');
+  if (btn) { btn.innerHTML = '<span class="spinner"></span>'; btn.disabled = true; }
+  try {
+    let params = `select=*&order=creado_en.desc&limit=200`;
+    if (filtroUser) params += `&username=ilike.*${filtroUser}*`;
+    if (filtroMod)  params += `&modulo=eq.${filtroMod}`;
+    const data = await sbGet('panel_auditoria', params);
+    const tbody = document.getElementById('tbodyAuditoria');
+    if (!tbody) return;
+    if (!data.length) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted)">Sin registros</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = data.map(r => `
+      <tr>
+        <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${new Date(r.creado_en).toLocaleString('es-PE')}</td>
+        <td><strong style="font-size:12px">${r.username}</strong>
+          <span class="role-badge ${r.rol==='admin'?'role-admin':r.rol==='jefe_area'?'role-jefe':'role-consulta'}" style="margin-left:4px">${(r.rol||'').toUpperCase()}</span>
+        </td>
+        <td><span class="badge badge-blue" style="font-size:10px">${r.modulo||'—'}</span></td>
+        <td style="font-family:var(--mono);font-size:12px;color:var(--accent)">${r.accion}</td>
+        <td style="font-size:11px;color:var(--muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.detalle ? JSON.stringify(r.detalle) : '—'}</td>
+      </tr>`).join('');
+  } catch(e) { toast('Error cargando auditoría: ' + e.message, 'error'); }
+  finally { if (btn) { btn.innerHTML = 'Cargar log'; btn.disabled = false; } }
+}
+
+
+// ── Switch tabs usuarios/auditoría ───────────────────────────
+function switchUsrTab(tab) {
+  const isUsr = tab === 'usuarios';
+  document.getElementById('panelUsuarios').style.display  = isUsr ? '' : 'none';
+  document.getElementById('panelAuditoria').style.display = isUsr ? 'none' : '';
+  document.getElementById('tabUsuariosBtn').style.borderBottomColor  = isUsr ? 'var(--accent)' : 'transparent';
+  document.getElementById('tabUsuariosBtn').style.color              = isUsr ? 'var(--accent)' : 'var(--muted)';
+  document.getElementById('tabAuditoriaBtn').style.borderBottomColor = isUsr ? 'transparent' : 'var(--accent)';
+  document.getElementById('tabAuditoriaBtn').style.color             = isUsr ? 'var(--muted)' : 'var(--accent)';
+  if (!isUsr) cargarAuditoria();
+}
 </script>
 </body>
 </html>
