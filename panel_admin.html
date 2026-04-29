@@ -283,6 +283,29 @@ body.rol-jefe .nav-item[data-page="usuarios"] {
   .hdr-right .role-badge { display:none; }
 }
 
+
+/* ── Cards de alertas incompletas ─────────────────────────────── */
+.incompletas-lista { display:flex; flex-direction:column; gap:6px; }
+.incompleta-card {
+  display:flex; align-items:center; justify-content:space-between;
+  gap:12px; padding:8px 10px;
+  border-top:1px solid rgba(48,54,61,0.5);
+  flex-wrap:wrap;
+}
+.incompleta-info { flex:1; min-width:0; }
+.incompleta-nombre { margin-bottom:4px; font-size:13px; }
+.incompleta-meta {
+  display:flex; flex-wrap:wrap; gap:8px;
+  align-items:center; font-size:12px;
+}
+.incompleta-accion { flex-shrink:0; }
+
+@media (max-width:768px) {
+  .incompleta-card { padding:10px 6px; }
+  .incompleta-accion { width:100%; }
+  .incompleta-accion .btn { width:100%; justify-content:center; }
+}
+
 </style>
 </head>
 <body>
@@ -291,7 +314,7 @@ body.rol-jefe .nav-item[data-page="usuarios"] {
 <div id="login-screen">
   <div class="login-box">
     <div class="login-logo">▸ TELNET SP</div>
-    <div class="login-title">Panel de Administración de Asistencia</div>
+    <div class="login-title">Panel de Administración</div>
     <div class="login-sub">Acceso restringido a personal autorizado</div>
     <div class="field">
       <label>Usuario</label>
@@ -315,7 +338,7 @@ body.rol-jefe .nav-item[data-page="usuarios"] {
       <button id="menuToggle" onclick="toggleSidebar()" aria-label="Menú">☰</button>
       <div class="hdr-logo">▸ TELNET SP</div>
       <div class="hdr-sep"></div>
-      <div class="hdr-module" id="hdrModule">Panel de Administración de Asistencia</div>
+      <div class="hdr-module" id="hdrModule">Panel de Administración</div>
     </div>
     <div class="hdr-right">
     <div id="sessionBar">
@@ -522,25 +545,14 @@ body.rol-jefe .nav-item[data-page="usuarios"] {
         <!-- Panel de alertas marcaciones incompletas -->
         <div id="alertasIncompletas" style="display:none;margin-bottom:16px;">
           <div style="background:rgba(240,136,62,0.1);border:1px solid rgba(240,136,62,0.4);border-radius:var(--radius);padding:14px 16px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
               <div style="font-size:13px;font-weight:600;color:var(--warn);">
                 ⚠ Marcaciones incompletas — <span id="cntIncompletas">0</span> trabajador(es)
               </div>
               <button class="btn btn-secondary btn-sm" onclick="cargarAlertasIncompletas()">↺ Actualizar</button>
             </div>
-            <table style="width:100%;font-size:12px;">
-              <thead>
-                <tr>
-                  <th style="text-align:left;padding:4px 8px;color:var(--muted);font-family:var(--mono);font-size:10px;">TRABAJADOR</th>
-                  <th style="text-align:left;padding:4px 8px;color:var(--muted);font-family:var(--mono);font-size:10px;">FECHA</th>
-                  <th style="text-align:left;padding:4px 8px;color:var(--muted);font-family:var(--mono);font-size:10px;">PRIMERA ENTRADA</th>
-                  <th style="text-align:left;padding:4px 8px;color:var(--muted);font-family:var(--mono);font-size:10px;">ÚLTIMA MARCA</th>
-                  <th style="text-align:left;padding:4px 8px;color:var(--muted);font-family:var(--mono);font-size:10px;">ESTADO</th>
-                  <th style="text-align:left;padding:4px 8px;color:var(--muted);font-family:var(--mono);font-size:10px;">ACCIÓN</th>
-                </tr>
-              </thead>
-              <tbody id="tbodyIncompletas"></tbody>
-            </table>
+            <!-- Desktop: tabla | Móvil: cards -->
+            <div id="listaIncompletas" class="incompletas-lista"></div>
           </div>
         </div>
         <div class="data-table-wrap">
@@ -551,7 +563,19 @@ body.rol-jefe .nav-item[data-page="usuarios"] {
           </div>
           <table>
             <thead>
-              <tr><th>DNI</th><th>Trabajador</th><th>Fecha</th><th>Hora</th><th>Tipo</th><th>Fuente</th><th>Ubicación</th><th style="text-align:center">GPS</th><th>Foto</th><th>Estado</th><th></th></tr>
+              <tr>
+                <th class="col-hide-mobile">DNI</th>
+                <th>Trabajador</th>
+                <th>Fecha</th>
+                <th>Hora</th>
+                <th>Tipo</th>
+                <th class="col-hide-mobile">Fuente</th>
+                <th class="col-hide-mobile">Ubicación</th>
+                <th class="col-hide-mobile" style="text-align:center">GPS</th>
+                <th class="col-hide-mobile">Foto</th>
+                <th>Estado</th>
+                <th></th>
+              </tr>
             </thead>
             <tbody id="tbodyMarca">
               <tr><td colspan="11"><div class="empty-state"><div class="empty-ico">⏳</div><p>Seleccione una fecha para filtrar</p></div></td></tr>
@@ -2104,25 +2128,22 @@ async function cargarMarcaciones() {
     const tbody = document.getElementById('tbodyMarca');
     tbody.innerHTML = data.map(m => `
       <tr>
-        <td style="font-family:var(--mono);color:var(--muted)">${m.dni}</td>
-        <td>${m.trabajadores ? `${m.trabajadores.nombres} ${m.trabajadores.apellido_paterno}` : '<span style="color:var(--muted)">—</span>'}</td>
+        <td class="col-hide-mobile" style="font-family:var(--mono);color:var(--muted)">${m.dni}</td>
+        <td><strong style="font-size:12px">${m.trabajadores ? m.trabajadores.nombres+' '+m.trabajadores.apellido_paterno : '<span style="color:var(--muted)">—</span>'}</strong></td>
         <td style="font-family:var(--mono);font-size:12px">${fmtFecha(m.fecha)}</td>
-        <td style="font-family:var(--mono)">${fmtHora(m.hora)}</td>
+        <td style="font-family:var(--mono);font-weight:600;color:var(--accent)">${fmtHora(m.hora)}</td>
         <td>${m.tipo === 'Entrada' ? '<span class="badge badge-green">Entrada</span>' : '<span class="badge badge-blue">Salida</span>'}</td>
-        <td><span class="badge ${m.fuente==='Biometrico'?'badge-amber':'badge-teal'}">${m.fuente}</span></td>
-        <td style="font-size:12px">${m.ubicacion||'—'}</td>
-        <td style="text-align:center">
+        <td class="col-hide-mobile"><span class="badge ${m.fuente==='Biometrico'?'badge-amber':'badge-teal'}">${m.fuente}</span></td>
+        <td class="col-hide-mobile" style="font-size:12px">${m.ubicacion||'—'}</td>
+        <td class="col-hide-mobile" style="text-align:center">
           ${m.maps_url
-            ? `<a href="${m.maps_url}" target="_blank"
-                title="Ver ubicación en Google Maps"
-                style="font-size:18px;text-decoration:none;cursor:pointer;">📍</a>`
+            ? `<a href="${m.maps_url}" target="_blank" style="font-size:18px;text-decoration:none">📍</a>`
             : '<span style="color:var(--muted);font-size:11px">—</span>'
           }
         </td>
-        <td>${m.foto_url ?
-          `<img src="${m.foto_url}" onclick="verFoto('${m.foto_url}','${m.trabajadores ? m.trabajadores.nombres+' '+m.trabajadores.apellido_paterno : m.dni}','${m.fecha}','${m.hora}')"
-            style="width:36px;height:36px;object-fit:cover;border-radius:6px;cursor:pointer;border:2px solid var(--accent);"
-            title="Ver foto de verificación">`
+        <td class="col-hide-mobile">${m.foto_url
+          ? `<img src="${m.foto_url}" onclick="verFoto('${m.foto_url}','${m.trabajadores ? m.trabajadores.nombres+' '+m.trabajadores.apellido_paterno : m.dni}','${m.fecha}','${m.hora}')"
+              style="width:36px;height:36px;object-fit:cover;border-radius:6px;cursor:pointer;border:2px solid var(--accent);">`
           : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
         <td><span class="badge badge-green">Activo</span></td>
         <td><button class="btn btn-danger btn-sm" onclick="anularMarcacion(${m.id})">Anular</button></td>
@@ -2902,12 +2923,9 @@ async function cargarAlertasIncompletas() {
       const cntEl = document.getElementById('cntIncompletas');
       if (cntEl) cntEl.textContent = data.length;
 
-      document.getElementById('tbodyIncompletas').innerHTML = data.map(r => {
+      document.getElementById('listaIncompletas').innerHTML = data.map(r => {
         const esSinEntrada = r.estado_dia === 'Sin entrada';
-        const badgeMarca = r.tipo_ultima_marcacion
-          ? `<span class="badge ${r.tipo_ultima_marcacion==='Entrada'?'badge-green':'badge-blue'}" style="margin-left:4px;font-size:10px">${r.tipo_ultima_marcacion}</span>`
-          : '<span style="color:var(--muted);font-size:11px">—</span>';
-        const accion = esSinEntrada
+        const accionBtn = esSinEntrada
           ? `<button class="btn btn-secondary btn-sm"
                onclick="abrirEntradaManual('${r.trabajador_id}','${r.nombre_completo}','${r.dni}','${r.fecha}','${r.ultima_salida||''}','${r.ubicacion_ultima||'Oficina Principal'}')">
                ↑ Entrada manual
@@ -2917,24 +2935,27 @@ async function cargarAlertasIncompletas() {
                ↓ Salida manual
              </button>`;
         return `
-        <tr style="border-top:1px solid rgba(48,54,61,0.5)">
-          <td style="padding:6px 8px">
-            <strong>${r.nombre_completo}</strong>
-            <span style="color:var(--muted);font-size:11px;margin-left:6px">${r.dni}</span>
-          </td>
-          <td style="padding:6px 8px;font-family:var(--mono)">${fmtFecha(r.fecha)}</td>
-          <td style="padding:6px 8px;font-family:var(--mono);color:${esSinEntrada?'var(--muted)':'var(--success)'}">
-            ${esSinEntrada ? '<span style="color:var(--muted);font-size:11px">—</span>' : fmtHora(r.primera_entrada)}
-          </td>
-          <td style="padding:6px 8px;font-family:var(--mono)">
-            ${fmtHora(r.ultima_marcacion)} ${badgeMarca}
-            <span style="color:var(--muted);font-size:10px;margin-left:4px">${r.ubicacion_ultima||''}</span>
-          </td>
-          <td style="padding:6px 8px">
-            <span class="badge ${esSinEntrada?'badge-blue':'badge-amber'}">${r.estado_dia}</span>
-          </td>
-          <td style="padding:6px 8px;white-space:nowrap">${accion}</td>
-        </tr>`;
+        <div class="incompleta-card">
+          <div class="incompleta-info">
+            <div class="incompleta-nombre">
+              <strong>${r.nombre_completo}</strong>
+              <span style="color:var(--muted);font-size:11px;margin-left:6px">${r.dni}</span>
+            </div>
+            <div class="incompleta-meta">
+              <span style="font-family:var(--mono);font-size:12px">${fmtFecha(r.fecha)}</span>
+              ${esSinEntrada
+                ? `<span style="color:var(--muted);font-size:12px">Entrada: —</span>`
+                : `<span style="color:var(--success);font-family:var(--mono);font-size:12px">Entrada: ${fmtHora(r.primera_entrada)}</span>`
+              }
+              <span style="font-family:var(--mono);font-size:12px">
+                Última: ${fmtHora(r.ultima_marcacion)}
+                <span class="badge ${r.tipo_ultima_marcacion==='Entrada'?'badge-green':'badge-blue'}" style="font-size:10px">${r.tipo_ultima_marcacion||'—'}</span>
+              </span>
+              <span class="badge ${esSinEntrada?'badge-blue':'badge-amber'}">${r.estado_dia}</span>
+            </div>
+          </div>
+          <div class="incompleta-accion">${accionBtn}</div>
+        </div>`;
       }).join('');
     } else {
       if (badge) badge.style.display = 'none';
