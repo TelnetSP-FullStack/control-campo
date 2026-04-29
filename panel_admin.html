@@ -2402,53 +2402,122 @@ function exportarCSV() {
 }
 
 function exportarExcel() {
-  // Exportar como TSV que Excel abre nativamente
-  let headers, rows, filename;
+  let headers, bodyRows, filename;
+
+  // ── RESUMEN MENSUAL ────────────────────────────────────────────
   if (reporteActivo === 'resumen') {
-    headers = ['DNI','Nombre Completo','Cargo','Tipo','Dias Asistidos','Dias Falta',
-               'Dias Tardanza','Horas Trabajadas','Min Tardanza','Desc Tardanza S/',
-               'Min H.Extra','Monto H.Extra S/','Sueldo Base S/'];
-    rows = reporteData.map(r => [
+    // Columnas: sin Desc Tardanza S/, Monto H.Extra S/ ni Sueldo Base S/
+    headers = ['DNI','Nombre Completo','Cargo','Tipo',
+               'Dias Asistidos','Dias Falta','Dias Tardanza',
+               'Horas Trabajadas','Min Tardanza','Min H.Extra'];
+
+    const dataRows = reporteData.map(r => [
       r.dni, r.nombre_completo, r.cargo, r.tipo_trabajador,
-      r.dias_asistidos||0, r.dias_falta||0, r.dias_tardanza||0,
-      r.total_horas_trabajadas||0, r.total_min_tardanza||0,
-      parseFloat(r.monto_descuento_tardanza||0).toFixed(2),
-      r.total_min_horas_extra||0,
-      parseFloat(r.monto_horas_extra||0).toFixed(2),
-      parseFloat(r.sueldo_base||0).toFixed(2),
+      r.dias_asistidos    || 0,
+      r.dias_falta        || 0,
+      r.dias_tardanza     || 0,
+      r.total_horas_trabajadas || 0,
+      r.total_min_tardanza     || 0,
+      r.total_min_horas_extra  || 0,
     ]);
+
+    // Fila de totales — columnas 4, 5, 6 (Asistidos, Falta, Tardanza)
+    const totalAsistidos = dataRows.reduce((s,r) => s + Number(r[4]), 0);
+    const totalFaltas    = dataRows.reduce((s,r) => s + Number(r[5]), 0);
+    const totalTardanzas = dataRows.reduce((s,r) => s + Number(r[6]), 0);
+    const filaTotal = ['','TOTALES','','',
+      totalAsistidos, totalFaltas, totalTardanzas, '', '', ''];
+
+    // Construir HTML de filas de datos + fila total
+    const trDatos = dataRows.map((r,i) =>
+      `<tr style="background:${i%2===0?'#ffffff':'#f9f9f9'}">
+        ${r.map((v,ci) => `<td style="padding:4px 8px;border:1px solid #ddd;${ci>=4&&ci<=6?'text-align:center;':''}${ci>=7?'text-align:right;':''}">${v}</td>`).join('')}
+      </tr>`
+    ).join('');
+
+    const trTotal =
+      `<tr style="background:#1F4E79;color:white;font-weight:bold">
+        ${filaTotal.map((v,ci) => `<td style="padding:5px 8px;border:1px solid #0d3661;${ci>=4&&ci<=6?'text-align:center;':''}${ci>=7?'text-align:right;':''}">${v}</td>`).join('')}
+      </tr>`;
+
+    bodyRows = trDatos + trTotal;
     filename = `Resumen_Asistencia_${document.getElementById('filtroMesReporte').value}.xls`;
+
+  // ── DETALLE DIARIO ─────────────────────────────────────────────
   } else {
     headers = ['Fecha','Trabajador','Cargo','Entrada Prog','Salida Prog',
                'Primera Entrada','Ultima Salida','Horas Trab','Tard Min',
-               'Desc Tard S/','Extra Min','Extra S/','Estado'];
-    rows = detalleData.map(r => [
-      r.fecha, r.nombre_completo, r.cargo,
-      r.hora_prog_entrada||'', r.hora_prog_salida||'',
-      r.primera_entrada||'', r.ultima_salida||'',
-      r.horas_trabajadas||0, r.tardanza_min||0,
-      parseFloat(r.monto_descuento_tardanza||0).toFixed(2),
-      r.horas_extra_min||0,
-      parseFloat(r.monto_horas_extra||0).toFixed(2),
-      r.estado_dia||'',
-    ]);
+               'Extra Min','Estado'];
+
+    // Ordenar por trabajador, luego por fecha
+    const sorted = [...detalleData].sort((a,b) => {
+      const nt = (a.nombre_completo||'').localeCompare(b.nombre_completo||'');
+      if (nt !== 0) return nt;
+      return (a.fecha||'').localeCompare(b.fecha||'');
+    });
+
+    // Agrupar por trabajador y generar filas con quiebre + subtotal
+    let trAll = '';
+    let i = 0;
+    while (i < sorted.length) {
+      const trabNombre = sorted[i].nombre_completo;
+      const grupo = [];
+      while (i < sorted.length && sorted[i].nombre_completo === trabNombre) {
+        grupo.push(sorted[i]);
+        i++;
+      }
+
+      // Filas del grupo
+      grupo.forEach((r, gi) => {
+        const bg = gi % 2 === 0 ? '#ffffff' : '#f0f4f8';
+        trAll += `<tr style="background:${bg}">
+          <td style="padding:4px 8px;border:1px solid #ddd;font-family:monospace">${r.fecha||''}</td>
+          <td style="padding:4px 8px;border:1px solid #ddd">${r.nombre_completo||''}</td>
+          <td style="padding:4px 8px;border:1px solid #ddd;font-size:11px;color:#555">${r.cargo||''}</td>
+          <td style="padding:4px 8px;border:1px solid #ddd;font-family:monospace;text-align:center">${r.hora_prog_entrada||''}</td>
+          <td style="padding:4px 8px;border:1px solid #ddd;font-family:monospace;text-align:center">${r.hora_prog_salida||''}</td>
+          <td style="padding:4px 8px;border:1px solid #ddd;font-family:monospace;text-align:center;color:#1a7f3c">${r.primera_entrada||''}</td>
+          <td style="padding:4px 8px;border:1px solid #ddd;font-family:monospace;text-align:center">${r.ultima_salida||''}</td>
+          <td style="padding:4px 8px;border:1px solid #ddd;text-align:right">${r.horas_trabajadas||0}</td>
+          <td style="padding:4px 8px;border:1px solid #ddd;text-align:right">${r.tardanza_min||0}</td>
+          <td style="padding:4px 8px;border:1px solid #ddd;text-align:right">${r.horas_extra_min||0}</td>
+          <td style="padding:4px 8px;border:1px solid #ddd;text-align:center">${r.estado_dia||''}</td>
+        </tr>`;
+      });
+
+      // Fila de subtotal del trabajador
+      const diasTrab = grupo.length;
+      trAll += `<tr style="background:#2E75B6;color:white;font-weight:bold">
+        <td colspan="2" style="padding:4px 8px;border:1px solid #1a5a9e">
+          Cuenta ${trabNombre}
+        </td>
+        <td colspan="5" style="padding:4px 8px;border:1px solid #1a5a9e"></td>
+        <td style="padding:4px 8px;border:1px solid #1a5a9e;text-align:center">${diasTrab}</td>
+        <td colspan="3" style="padding:4px 8px;border:1px solid #1a5a9e"></td>
+      </tr>`;
+
+      // Fila separadora entre grupos
+      if (i < sorted.length) {
+        trAll += `<tr><td colspan="${headers.length}" style="padding:2px;background:#e8edf2;border:none"></td></tr>`;
+      }
+    }
+
+    bodyRows = trAll;
     filename = `Detalle_${document.getElementById('filtroDetalleDesde').value}_al_${document.getElementById('filtroDetalleHasta').value}.xls`;
   }
-  // HTML table que Excel abre con formato
+
+  // ── Generar archivo HTML-Excel ─────────────────────────────────
+  const thStyle = 'background:#C0001A;color:white;font-weight:bold;padding:6px 8px;border:1px solid #900;text-align:center';
   const tableHtml = `
     <html xmlns:o="urn:schemas-microsoft-com:office:office"
           xmlns:x="urn:schemas-microsoft-com:office:excel"
           xmlns="http://www.w3.org/TR/REC-html40">
-    <head><meta charset="UTF-8">
-    <style>
-      th { background:#C0001A;color:white;font-weight:bold;padding:6px; }
-      td { padding:4px 8px;border:1px solid #ddd; }
-      tr:nth-child(even) td { background:#f9f9f9; }
-    </style></head><body>
-    <table border="1">
-      <thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead>
-      <tbody>${rows.map(r=>`<tr>${r.map(v=>`<td>${v}</td>`).join('')}</tr>`).join('')}</tbody>
+    <head><meta charset="UTF-8"></head><body>
+    <table border="0" cellspacing="0" cellpadding="0">
+      <thead><tr>${headers.map(h=>`<th style="${thStyle}">${h}</th>`).join('')}</tr></thead>
+      <tbody>${bodyRows}</tbody>
     </table></body></html>`;
+
   const blob = new Blob([tableHtml], { type: 'application/vnd.ms-excel;charset=utf-8;' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
