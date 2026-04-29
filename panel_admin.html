@@ -2828,31 +2828,40 @@ async function cargarAlertasIncompletas() {
       const cntEl = document.getElementById('cntIncompletas');
       if (cntEl) cntEl.textContent = data.length;
 
-      document.getElementById('tbodyIncompletas').innerHTML = data.map(r => `
+      document.getElementById('tbodyIncompletas').innerHTML = data.map(r => {
+        const esSinEntrada = r.estado_dia === 'Sin entrada';
+        const badgeMarca = r.tipo_ultima_marcacion
+          ? `<span class="badge ${r.tipo_ultima_marcacion==='Entrada'?'badge-green':'badge-blue'}" style="margin-left:4px;font-size:10px">${r.tipo_ultima_marcacion}</span>`
+          : '<span style="color:var(--muted);font-size:11px">—</span>';
+        const accion = esSinEntrada
+          ? `<button class="btn btn-secondary btn-sm"
+               onclick="abrirEntradaManual('${r.trabajador_id}','${r.nombre_completo}','${r.dni}','${r.fecha}','${r.ultima_salida||''}','${r.ubicacion_ultima||'Oficina Principal'}')">
+               ↑ Entrada manual
+             </button>`
+          : `<button class="btn btn-secondary btn-sm"
+               onclick="abrirSalidaManual('${r.trabajador_id}','${r.nombre_completo}','${r.dni}','${r.fecha}','${r.primera_entrada||''}','${r.ubicacion_ultima||'Oficina Principal'}')">
+               ↓ Salida manual
+             </button>`;
+        return `
         <tr style="border-top:1px solid rgba(48,54,61,0.5)">
           <td style="padding:6px 8px">
             <strong>${r.nombre_completo}</strong>
             <span style="color:var(--muted);font-size:11px;margin-left:6px">${r.dni}</span>
           </td>
           <td style="padding:6px 8px;font-family:var(--mono)">${fmtFecha(r.fecha)}</td>
-          <td style="padding:6px 8px;font-family:var(--mono);color:var(--success)">${fmtHora(r.primera_entrada)}</td>
+          <td style="padding:6px 8px;font-family:var(--mono);color:${esSinEntrada?'var(--muted)':'var(--success)'}">
+            ${esSinEntrada ? '<span style="color:var(--muted);font-size:11px">—</span>' : fmtHora(r.primera_entrada)}
+          </td>
           <td style="padding:6px 8px;font-family:var(--mono)">
-            ${fmtHora(r.ultima_marcacion)}
-            <span class="badge ${r.tipo_ultima_marcacion==='Entrada'?'badge-green':'badge-blue'}" style="margin-left:4px;font-size:10px">
-              ${r.tipo_ultima_marcacion||'—'}
-            </span>
+            ${fmtHora(r.ultima_marcacion)} ${badgeMarca}
             <span style="color:var(--muted);font-size:10px;margin-left:4px">${r.ubicacion_ultima||''}</span>
           </td>
           <td style="padding:6px 8px">
-            <span class="badge badge-amber">${r.estado_dia}</span>
+            <span class="badge ${esSinEntrada?'badge-blue':'badge-amber'}">${r.estado_dia}</span>
           </td>
-          <td style="padding:6px 8px;white-space:nowrap">
-            <button class="btn btn-secondary btn-sm"
-              onclick="abrirSalidaManual('${r.trabajador_id}','${r.nombre_completo}','${r.dni}','${r.fecha}','${r.primera_entrada||''}','${r.ubicacion_ultima||'Oficina Principal'}')">
-              ↓ Salida manual
-            </button>
-          </td>
-        </tr>`).join('');
+          <td style="padding:6px 8px;white-space:nowrap">${accion}</td>
+        </tr>`;
+      }).join('');
     } else {
       if (badge) badge.style.display = 'none';
       const panelAlert = document.getElementById('alertasIncompletas');
@@ -2864,36 +2873,53 @@ async function cargarAlertasIncompletas() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  SALIDA MANUAL desde alertas
+//  ENTRADA / SALIDA MANUAL desde alertas
+//  El mismo modal se reutiliza para ambos tipos.
+//  _smModo = 'entrada' | 'salida'
 // ═══════════════════════════════════════════════════════════════
 let smTrabajadorId = null;
 let smFecha        = null;
 let smDni          = null;
+let _smModo        = 'salida';
 
-function abrirSalidaManual(trabId, nombre, dni, fecha, primeraEntrada, ubicacion) {
+function _abrirModalManual(trabId, nombre, dni, fecha, refHora, ubicacion, modo) {
   smTrabajadorId = trabId;
   smFecha        = fecha;
   smDni          = dni;
+  _smModo        = modo;
+
+  const esSalida = modo === 'salida';
+  document.querySelector('#modalSalidaManual .modal-title').textContent =
+    esSalida ? 'Registrar salida manual' : 'Registrar entrada manual';
+  document.getElementById('btnGuardarSalidaManual').textContent =
+    esSalida ? 'Registrar salida' : 'Registrar entrada';
 
   document.getElementById('smInfoTrab').textContent  = nombre + ' — DNI: ' + dni;
   document.getElementById('smInfoFecha').textContent = 'Fecha: ' + fmtFecha(fecha) +
-    (primeraEntrada ? '  |  Primera entrada: ' + fmtHora(primeraEntrada) : '');
+    (refHora ? (esSalida ? '  |  Primera entrada: ' : '  |  Salida registrada: ') + fmtHora(refHora) : '');
   document.getElementById('smUbicacion').value = ubicacion || 'Oficina Principal';
   document.getElementById('smMotivo').value    = '';
   document.getElementById('smError').style.display = 'none';
 
-  // Hora sugerida: hora actual si es hoy, 18:00 si es otro día
+  // Hora sugerida
   const hoy = new Date().toISOString().slice(0,10);
   if (fecha === hoy) {
     const now = new Date();
-    const hh  = String(now.getHours()).padStart(2,'0');
-    const mm  = String(now.getMinutes()).padStart(2,'0');
-    document.getElementById('smHora').value = `${hh}:${mm}`;
+    document.getElementById('smHora').value =
+      String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
   } else {
-    document.getElementById('smHora').value = '18:00';
+    document.getElementById('smHora').value = esSalida ? '18:00' : '08:00';
   }
 
   abrirModal('modalSalidaManual');
+}
+
+function abrirSalidaManual(trabId, nombre, dni, fecha, primeraEntrada, ubicacion) {
+  _abrirModalManual(trabId, nombre, dni, fecha, primeraEntrada, ubicacion, 'salida');
+}
+
+function abrirEntradaManual(trabId, nombre, dni, fecha, ultimaSalida, ubicacion) {
+  _abrirModalManual(trabId, nombre, dni, fecha, ultimaSalida, ubicacion, 'entrada');
 }
 
 document.getElementById('btnGuardarSalidaManual').addEventListener('click', async () => {
@@ -2903,9 +2929,15 @@ document.getElementById('btnGuardarSalidaManual').addEventListener('click', asyn
   const errEl     = document.getElementById('smError');
   errEl.style.display = 'none';
 
-  if (!hora) { errEl.textContent = 'Ingrese la hora de salida'; errEl.style.display='block'; return; }
+  const tipoMarca = _smModo === 'entrada' ? 'Entrada' : 'Salida';
+
+  if (!hora) {
+    errEl.textContent = `Ingrese la hora de ${tipoMarca.toLowerCase()}`;
+    errEl.style.display = 'block'; return;
+  }
   if (!smTrabajadorId || !smFecha || !smDni) {
-    errEl.textContent = 'Error: datos del trabajador no disponibles'; errEl.style.display='block'; return;
+    errEl.textContent = 'Error: datos del trabajador no disponibles';
+    errEl.style.display = 'block'; return;
   }
 
   const btn = document.getElementById('btnGuardarSalidaManual');
@@ -2913,8 +2945,7 @@ document.getElementById('btnGuardarSalidaManual').addEventListener('click', asyn
   btn.disabled  = true;
 
   try {
-    // Insertar marcación de salida manual
-    const { error } = await fetch(`${SB_URL}/rest/v1/marcaciones`, {
+    const resp = await fetch(`${SB_URL}/rest/v1/marcaciones`, {
       method:  'POST',
       headers: { ...HEADERS, 'Prefer': 'return=minimal' },
       body: JSON.stringify({
@@ -2922,20 +2953,23 @@ document.getElementById('btnGuardarSalidaManual').addEventListener('click', asyn
         dni           : smDni,
         fecha         : smFecha,
         hora          : hora + ':00',
-        tipo          : 'Salida',
+        tipo          : tipoMarca,
         fuente        : 'Manual',
         ubicacion     : ubicacion || 'Oficina Principal',
         estado        : 'Activo',
         timestamp_iso : new Date(`${smFecha}T${hora}:00`).toISOString(),
       })
-    }).then(async r => ({ ok: r.ok, error: r.ok ? null : await r.text() }));
+    });
 
-    if (error) throw new Error(error);
+    if (!resp.ok) throw new Error(await resp.text());
 
-    toast(`✓ Salida manual registrada — ${fmtFecha(smFecha)} ${hora}${motivo ? ' — ' + motivo : ''}`);
+    await auditLog(`MARCACION_MANUAL_${tipoMarca.toUpperCase()}`, 'marcaciones', {
+      trabajador_id: smTrabajadorId, fecha: smFecha, hora, motivo: motivo || null
+    });
+
+    toast(`✓ ${tipoMarca} manual registrada — ${fmtFecha(smFecha)} ${hora}${motivo ? ' — ' + motivo : ''}`);
     cerrarModal('modalSalidaManual');
 
-    // Recargar alertas y marcaciones
     setTimeout(() => {
       cargarAlertasIncompletas();
       cargarMarcaciones();
@@ -2945,7 +2979,7 @@ document.getElementById('btnGuardarSalidaManual').addEventListener('click', asyn
     errEl.textContent = 'Error al registrar: ' + e.message;
     errEl.style.display = 'block';
   } finally {
-    btn.innerHTML = 'Registrar salida';
+    btn.innerHTML = _smModo === 'entrada' ? 'Registrar entrada' : 'Registrar salida';
     btn.disabled  = false;
   }
 });
