@@ -175,6 +175,7 @@ body.rol-consulta #btnNuevoPermiso,
 body.rol-consulta #btnNuevoFeriado,
 body.rol-consulta #btnNuevoUsuario,
 body.rol-consulta #btnExtraerBio,
+body.rol-consulta #btnNuevaMarcacion,
 body.rol-consulta .nav-item[data-page="usuarios"] {
   display: none !important;
 }
@@ -535,8 +536,9 @@ body.rol-jefe .nav-item[data-page="usuarios"] {
       <div class="page" id="page-marcaciones">
         <div class="page-hdr">
           <div><div class="page-title">Marcaciones</div><div class="page-sub">Registro de asistencia — corrección manual</div></div>
-          <div style="display:flex;gap:10px;align-items:center">
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
             <div id="agenteStatus" style="font-size:11px;font-family:var(--mono);color:var(--muted)">Verificando agente…</div>
+            <button class="btn btn-secondary" id="btnNuevaMarcacion">+ Agregar marcación</button>
             <button class="btn btn-primary" id="btnExtraerBio">⬇ Extraer biométrico</button>
           </div>
         </div>
@@ -1175,6 +1177,66 @@ body.rol-jefe .nav-item[data-page="usuarios"] {
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="cerrarModal('modalSalidaManual')">Cancelar</button>
       <button class="btn btn-primary" id="btnGuardarSalidaManual">Registrar salida</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL: Agregar / Editar marcación ──────────────────── -->
+<div class="modal-overlay" id="modalEditarMarcacion">
+  <div class="modal" style="width:460px">
+    <div class="modal-hdr">
+      <div class="modal-title" id="emTitle">Agregar marcación</div>
+      <button class="modal-close" onclick="cerrarModal('modalEditarMarcacion')">×</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:rgba(240,136,62,0.1);border:1px solid rgba(240,136,62,0.3);border-radius:var(--radius);padding:10px 14px;margin-bottom:16px;">
+        <div style="font-size:12px;color:var(--warn);font-family:var(--mono)">⚠ MODIFICACIÓN DE REGISTRO HISTÓRICO</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px;">
+          Este cambio se registra en auditoría y recalcula automáticamente el período laboral del día afectado.
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="form-field full">
+          <label>Trabajador *</label>
+          <select id="emTrabajador"></select>
+        </div>
+        <div class="form-field">
+          <label>Fecha *</label>
+          <input type="date" id="emFecha">
+        </div>
+        <div class="form-field">
+          <label>Hora *</label>
+          <input type="time" id="emHora" step="60">
+        </div>
+        <div class="form-field">
+          <label>Tipo *</label>
+          <select id="emTipo">
+            <option value="Entrada">Entrada</option>
+            <option value="Salida">Salida</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Fuente</label>
+          <select id="emFuente">
+            <option value="Manual">Manual</option>
+            <option value="Biometrico">Biométrico</option>
+            <option value="App">App</option>
+          </select>
+        </div>
+        <div class="form-field full">
+          <label>Ubicación</label>
+          <input type="text" id="emUbicacion" placeholder="Ej: Oficina Principal, Campo Norte…">
+        </div>
+        <div class="form-field full">
+          <label>Motivo de la modificación *</label>
+          <input type="text" id="emMotivo" placeholder="Ej: Corrección de hora — el trabajador marcó tarde por error del lector">
+        </div>
+      </div>
+      <div id="emError" style="display:none;font-size:12px;color:var(--danger);font-family:var(--mono);margin-top:8px;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="cerrarModal('modalEditarMarcacion')">Cancelar</button>
+      <button class="btn btn-primary" id="btnGuardarEditarMarcacion">Guardar</button>
     </div>
   </div>
 </div>
@@ -1821,7 +1883,7 @@ function poblarSelectTrab() {
   poblarFiltroDetalleTrab();
   const opts = '<option value="">— Seleccionar —</option>' +
     allTrab.filter(t => t.activo).map(t => `<option value="${t.id}">${t.nombres} ${t.apellido_paterno} (${t.dni})</option>`).join('');
-  ['aTrabajador','pTrabajador'].forEach(id => { document.getElementById(id).innerHTML = opts; });
+  ['aTrabajador','pTrabajador','emTrabajador'].forEach(id => { document.getElementById(id).innerHTML = opts; });
 }
 function poblarSelectHorarios() {
   const opts = '<option value="">— Seleccionar —</option>' +
@@ -2145,9 +2207,12 @@ async function cargarMarcaciones() {
           ? `<img src="${m.foto_url}" onclick="verFoto('${m.foto_url}','${m.trabajadores ? m.trabajadores.nombres+' '+m.trabajadores.apellido_paterno : m.dni}','${m.fecha}','${m.hora}')"
               style="width:36px;height:36px;object-fit:cover;border-radius:6px;cursor:pointer;border:2px solid var(--accent);">`
           : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
-        <td><span class="badge badge-green">Activo</span></td>
-        <td><button class="btn btn-danger btn-sm" onclick="anularMarcacion(${m.id})">Anular</button></td>
-      </tr>`).join('') || `<tr><td colspan="9"><div class="empty-state"><div class="empty-ico">📍</div><p>No hay marcaciones para este filtro</p></div></td></tr>`;
+        <td><span class="badge ${m.estado==='Activo'?'badge-green':'badge-gray'}">${m.estado}</span></td>
+        <td style="white-space:nowrap">
+          <button class="btn btn-secondary btn-sm" onclick='abrirEditarMarcacion(${JSON.stringify(m).replace(/'/g,"&#39;")})'>Editar</button>
+          ${m.estado === 'Activo' ? `<button class="btn btn-danger btn-sm" onclick="anularMarcacion(${m.id})" style="margin-left:4px">Anular</button>` : ''}
+        </td>
+      </tr>`).join('') || `<tr><td colspan="11"><div class="empty-state"><div class="empty-ico">📍</div><p>No hay marcaciones para este filtro</p></div></td></tr>`;
   } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
 
@@ -2168,6 +2233,115 @@ async function anularMarcacion(id) {
     cargarMarcaciones();
   } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
+
+// ═══════════════════════════════════════════════════════════════
+//  AGREGAR / EDITAR MARCACIÓN (mes actual o anteriores)
+//  Disponible para admin y jefe_area — bloqueado para consulta
+// ═══════════════════════════════════════════════════════════════
+let emEditId = null; // null = nueva marcación, id = editando existente
+
+function abrirNuevaMarcacion() {
+  if (currentUser?.rol === 'consulta') { toast('Sin permisos para esta acción', 'error'); return; }
+  emEditId = null;
+  document.getElementById('emTitle').textContent = 'Agregar marcación';
+  poblarSelectTrab();
+  document.getElementById('emTrabajador').value = '';
+  document.getElementById('emFecha').value       = document.getElementById('filtroFechaMarca').value || new Date().toISOString().slice(0,10);
+  document.getElementById('emHora').value        = '';
+  document.getElementById('emTipo').value        = 'Entrada';
+  document.getElementById('emFuente').value      = 'Manual';
+  document.getElementById('emUbicacion').value   = 'Oficina Principal';
+  document.getElementById('emMotivo').value      = '';
+  document.getElementById('emError').style.display = 'none';
+  abrirModal('modalEditarMarcacion');
+}
+
+function abrirEditarMarcacion(m) {
+  if (currentUser?.rol === 'consulta') { toast('Sin permisos para esta acción', 'error'); return; }
+  emEditId = m.id;
+  document.getElementById('emTitle').textContent = 'Editar marcación';
+  poblarSelectTrab();
+  document.getElementById('emTrabajador').value = m.trabajador_id;
+  document.getElementById('emFecha').value       = m.fecha;
+  document.getElementById('emHora').value        = (m.hora || '').slice(0,5);
+  document.getElementById('emTipo').value        = m.tipo;
+  document.getElementById('emFuente').value       = m.fuente;
+  document.getElementById('emUbicacion').value   = m.ubicacion || '';
+  document.getElementById('emMotivo').value      = '';
+  document.getElementById('emError').style.display = 'none';
+  abrirModal('modalEditarMarcacion');
+}
+
+document.getElementById('btnNuevaMarcacion').addEventListener('click', abrirNuevaMarcacion);
+
+document.getElementById('btnGuardarEditarMarcacion').addEventListener('click', async () => {
+  if (currentUser?.rol === 'consulta') { toast('Sin permisos para esta acción', 'error'); return; }
+
+  const tid       = document.getElementById('emTrabajador').value;
+  const fecha     = document.getElementById('emFecha').value;
+  const hora      = document.getElementById('emHora').value;
+  const tipo      = document.getElementById('emTipo').value;
+  const fuente    = document.getElementById('emFuente').value;
+  const ubicacion = document.getElementById('emUbicacion').value.trim();
+  const motivo    = document.getElementById('emMotivo').value.trim();
+  const errEl     = document.getElementById('emError');
+  errEl.style.display = 'none';
+
+  if (!tid || !fecha || !hora) {
+    errEl.textContent = 'Trabajador, fecha y hora son obligatorios';
+    errEl.style.display = 'block'; return;
+  }
+  if (!motivo) {
+    errEl.textContent = 'Debe indicar el motivo de la modificación (queda en auditoría)';
+    errEl.style.display = 'block'; return;
+  }
+
+  const btn = document.getElementById('btnGuardarEditarMarcacion');
+  btn.innerHTML = '<span class="spinner"></span>'; btn.disabled = true;
+
+  try {
+    const trab = allTrab.find(t => String(t.id) === String(tid));
+    const payload = {
+      trabajador_id : parseInt(tid),
+      dni           : trab ? trab.dni : null,
+      fecha, hora: hora + ':00',
+      tipo, fuente,
+      ubicacion     : ubicacion || 'Oficina Principal',
+      estado        : 'Activo',
+      timestamp_iso : new Date(`${fecha}T${hora}:00`).toISOString(),
+    };
+
+    if (emEditId) {
+      // Editar marcación existente
+      await sbPatch('marcaciones', emEditId, payload);
+      await auditLog('MARCACION_EDITADA', 'marcaciones', {
+        marcacion_id: emEditId, trabajador_id: parseInt(tid), fecha, hora, tipo, motivo
+      });
+      toast('✓ Marcación actualizada — período laboral recalculado');
+    } else {
+      // Nueva marcación manual
+      const nueva = await sbPost('marcaciones', payload);
+      const newId = Array.isArray(nueva) ? nueva[0]?.id : nueva?.id;
+      await auditLog('MARCACION_AGREGADA_MANUAL', 'marcaciones', {
+        marcacion_id: newId, trabajador_id: parseInt(tid), fecha, hora, tipo, motivo
+      });
+      toast('✓ Marcación agregada — período laboral recalculado');
+    }
+
+    cerrarModal('modalEditarMarcacion');
+    setTimeout(() => {
+      cargarMarcaciones();
+      cargarAlertasIncompletas();
+    }, 600);
+
+  } catch(e) {
+    errEl.textContent = 'Error al guardar: ' + e.message;
+    errEl.style.display = 'block';
+  } finally {
+    btn.innerHTML = 'Guardar';
+    btn.disabled  = false;
+  }
+});
 
 // ═══════════════════════════════════════════════════════════════
 //  REPORTES
