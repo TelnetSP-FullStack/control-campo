@@ -1047,6 +1047,7 @@ body.rol-jefe .nav-item[data-page="usuarios"] {
             <option value="Permiso sin goce">Permiso sin goce</option>
             <option value="Comisión de servicio">Comisión de servicio</option>
             <option value="Falta justificada">Falta justificada</option>
+            <option value="Descanso Programado">Descanso Programado</option>
             <option value="Otro">Otro</option>
           </select>
         </div>
@@ -2479,14 +2480,21 @@ document.getElementById('btnCargarDetalle').addEventListener('click', async () =
 
 function estadoDiaBadge(estado) {
   const m = {
-    'Asistio':    'badge-green',
-    'Tardanza':   'badge-amber',
-    'Falta':      'badge-red',
-    'Feriado':    'badge-blue',
-    'Permiso con goce': 'badge-teal',
-    'Vacaciones': 'badge-blue',
-    'Sin salida': 'badge-gray',
-    'Sin entrada':'badge-gray',
+    'Asistio':             'badge-green',
+    'Tardanza':            'badge-amber',
+    'Falta':               'badge-red',
+    'Feriado':             'badge-blue',
+    'Permiso con goce':    'badge-teal',
+    'Permiso sin goce':    'badge-gray',
+    'Vacaciones':          'badge-blue',
+    'Licencia médica':     'badge-teal',
+    'Licencia por maternidad': 'badge-teal',
+    'Licencia por paternidad': 'badge-teal',
+    'Comisión de servicio':'badge-teal',
+    'Falta justificada':   'badge-amber',
+    'Descanso Programado': 'badge-teal',
+    'Sin salida':          'badge-gray',
+    'Sin entrada':         'badge-gray',
   };
   return `<span class="badge ${m[estado]||'badge-gray'}">${estado||'—'}</span>`;
 }
@@ -2508,6 +2516,7 @@ function renderDetalle(data) {
       'Licencia por paternidad': 'Licencia paternidad',
       'Comisión de servicio':'Comisión de servicio',
       'Falta justificada':   'Falta justificada',
+      'Descanso Programado': 'Descanso programado',
       'Feriado':             'Día feriado',
       'Sin salida':          '⚠ Sin marcación de salida',
       'Sin entrada':         '⚠ Sin marcación de entrada',
