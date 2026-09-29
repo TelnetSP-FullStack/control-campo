@@ -2989,6 +2989,27 @@ async function verificarAgente() {
   }
 }
 
+// ── Extracción por bloques ───────────────────────────────────────
+// El agente inserta ~1 marcación/seg. Un rango largo supera el timeout del
+// navegador (120 s) aunque el agente esté funcionando bien, así que el rango
+// se parte en bloques cortos y se acumulan los totales.
+const BIO_DIAS_POR_BLOQUE = 3;
+const _fechaMs = s => { const [y,m,d] = s.split('-').map(Number); return Date.UTC(y, m-1, d); };
+const _msFecha = ms => new Date(ms).toISOString().slice(0,10);
+const _esc     = s => String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+function dividirRango(ini, fin, dias) {
+  const bloques = [];
+  const end = _fechaMs(fin);
+  let cur = _fechaMs(ini);
+  while (cur <= end) {
+    const hasta = Math.min(cur + (dias - 1) * 86400000, end);
+    bloques.push([_msFecha(cur), _msFecha(hasta)]);
+    cur = hasta + 86400000;
+  }
+  return bloques;
+}
+
 document.getElementById('btnExtraerBio').addEventListener('click', async () => {
   const resultDiv = document.getElementById('extraerResult');
   const btn       = document.getElementById('btnExtraerBio');
@@ -2996,54 +3017,99 @@ document.getElementById('btnExtraerBio').addEventListener('click', async () => {
   // Rango de fechas
   const hoy  = new Date().toISOString().slice(0,10);
   const ayer = new Date(Date.now() - 86400000).toISOString().slice(0,10);
-  const ini  = prompt('Fecha inicio (YYYY-MM-DD):', ayer);
+  let ini = prompt('Fecha inicio (YYYY-MM-DD):', ayer);
   if (!ini) return;
-  const fin  = prompt('Fecha fin (YYYY-MM-DD):', hoy);
+  let fin = prompt('Fecha fin (YYYY-MM-DD):', hoy);
   if (!fin) return;
+  ini = ini.trim(); fin = fin.trim();
 
-  btn.innerHTML = '<span class="spinner"></span> Extrayendo…';
-  btn.disabled  = true;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ini) || !/^\d{4}-\d{2}-\d{2}$/.test(fin) || ini > fin) {
+    toast('Fechas inválidas: use el formato YYYY-MM-DD y que inicio sea menor o igual a fin', 'error');
+    return;
+  }
+
+  const bloques = dividirRango(ini, fin, BIO_DIAS_POR_BLOQUE);
+  const tot = { en_rango: 0, insertados: 0, duplicados: 0, errores: 0 };
+  let hechos = 0;
+  let falla  = null;
+
+  btn.disabled = true;
   resultDiv.style.display = 'none';
 
   try {
-    const r = await fetch(
-      `${FN_PUENTE}?accion=extraer&ini=${ini}&fin=${fin}`,
-      { headers: FN_HEADERS, signal: AbortSignal.timeout(120000) }
-    );
-    const d = await r.json();
+    for (const [bIni, bFin] of bloques) {
+      btn.innerHTML = `<span class="spinner"></span> Extrayendo ${hechos + 1}/${bloques.length}…`;
+      try {
+        const r = await fetch(
+          `${FN_PUENTE}?accion=extraer&ini=${bIni}&fin=${bFin}`,
+          { headers: FN_HEADERS, signal: AbortSignal.timeout(120000) }
+        );
+        const d = await r.json();
+        if (d.error) { falla = { tipo: 'agente', bIni, bFin, msg: d.error }; break; }
+        tot.en_rango   += d.en_rango   || 0;
+        tot.insertados += d.insertados || 0;
+        tot.duplicados += d.duplicados || 0;
+        tot.errores    += d.errores    || 0;
+        hechos++;
+      } catch (e) {
+        const timeout = e.name === 'TimeoutError' || e.name === 'AbortError';
+        falla = { tipo: timeout ? 'timeout' : 'red', bIni, bFin, msg: e.message };
+        break;
+      }
+    }
 
-    const color = d.errores > 0 ? 'var(--warn)' : 'var(--success)';
+    // ── Resultado ────────────────────────────────────────────
     resultDiv.style.display = 'block';
-    resultDiv.innerHTML = `
-      <div style="color:${color};margin-bottom:8px;font-size:13px;font-weight:600">
-        ${d.error ? '✗ Error en la extracción' : '✓ Extracción completada'}
+    const resumen = `
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:8px 0">
+        <div>Período: <strong>${ini} → ${fin}</strong></div>
+        <div>En rango: <strong style="color:var(--accent)">${tot.en_rango}</strong></div>
+        <div>Insertados: <strong style="color:var(--success)">${tot.insertados}</strong></div>
+        <div>Duplicados: <strong style="color:var(--muted)">${tot.duplicados}</strong></div>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px">
-        <div>Período: <strong>${d.fecha_ini} → ${d.fecha_fin}</strong></div>
-        <div>En rango: <strong style="color:var(--accent)">${d.en_rango}</strong></div>
-        <div>Insertados: <strong style="color:var(--success)">${d.insertados}</strong></div>
-        <div>Duplicados: <strong style="color:var(--muted)">${d.duplicados}</strong></div>
-      </div>
-      ${d.error ? `<div style="color:var(--danger)">${d.error}</div>` : ''}
-      ${d.errores > 0 ? `<div style="color:var(--warn)">${d.errores} registros con error</div>` : ''}
-    `;
-    if (d.insertados > 0) {
-      toast(`✓ ${d.insertados} marcaciones importadas del biométrico`, 'success');
-      setTimeout(cargarMarcaciones, 1000);
-    } else if (!d.error) {
+      ${tot.errores > 0 ? `<div style="color:var(--warn)">${tot.errores} registros con error</div>` : ''}`;
+
+    if (!falla) {
+      const color = tot.errores > 0 ? 'var(--warn)' : 'var(--success)';
+      resultDiv.innerHTML = `
+        <div style="color:${color};font-size:13px;font-weight:600">
+          ✓ Extracción completada (${bloques.length} ${bloques.length === 1 ? 'bloque' : 'bloques'})
+        </div>${resumen}`;
+    } else if (falla.tipo === 'timeout') {
+      resultDiv.innerHTML = `
+        <div style="color:var(--warn);font-size:13px;font-weight:600">
+          ⚠ El bloque ${falla.bIni} → ${falla.bFin} superó el tiempo de espera
+        </div>
+        <div style="color:var(--muted);font-size:11px;margin-top:4px">
+          El agente puede haber terminado igualmente: revise la línea «Resumen» en su ventana.
+          Para continuar, vuelva a extraer desde <strong>${falla.bIni}</strong>; las marcaciones ya cargadas no se duplican.
+        </div>${resumen}`;
+      toast('Tiempo de espera agotado — verifique el agente y reintente', 'error');
+    } else if (falla.tipo === 'agente') {
+      resultDiv.innerHTML = `
+        <div style="color:var(--danger);font-size:13px;font-weight:600">✗ Error en la extracción (${falla.bIni} → ${falla.bFin})</div>
+        <div style="color:var(--danger);font-size:12px;margin-top:4px">${_esc(falla.msg)}</div>${resumen}`;
+      toast('Error en la extracción', 'error');
+    } else {
+      resultDiv.innerHTML = `
+        <div style="color:var(--danger);margin-bottom:8px">✗ No se pudo conectar al agente</div>
+        <div style="color:var(--muted);font-size:11px">
+          Verifique que ngrok y el agente están corriendo en la PC de la oficina.<br>
+          Comando agente: <strong>python agente_biometrico.py --servidor</strong><br>
+          Comando ngrok: <strong>ngrok http 8765</strong>
+        </div>${hechos > 0 ? resumen : ''}`;
+      toast('Agente no disponible', 'error');
+    }
+
+    if (tot.insertados > 0) {
+      toast(`✓ ${tot.insertados} marcaciones importadas del biométrico`, 'success');
+    } else if (!falla) {
       toast('Sin registros nuevos en el período seleccionado');
     }
-  } catch(e) {
-    resultDiv.style.display = 'block';
-    resultDiv.innerHTML = `
-      <div style="color:var(--danger);margin-bottom:8px">✗ No se pudo conectar al agente</div>
-      <div style="color:var(--muted);font-size:11px">
-        Verifique que ngrok y el agente están corriendo en la PC de la oficina.<br>
-        Comando agente: <strong>python agente_biometrico.py --servidor</strong><br>
-        Comando ngrok: <strong>ngrok http 8765</strong>
-      </div>
-    `;
-    toast('Agente no disponible', 'error');
+    // Refrescar siempre: en un timeout el agente pudo haber insertado igual
+    if (tot.insertados > 0 || (falla && falla.tipo === 'timeout')) {
+      setTimeout(() => { cargarMarcaciones(); cargarAlertasIncompletas(); }, 1000);
+    }
   } finally {
     btn.innerHTML = '⬇ Extraer biométrico';
     btn.disabled  = false;
