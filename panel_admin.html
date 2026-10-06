@@ -307,6 +307,15 @@ body.rol-jefe .nav-item[data-page="usuarios"] {
   .incompleta-accion .btn { width:100%; justify-content:center; }
 }
 
+/* ── Multiempresa ─────────────────────────────────────────── */
+.emp-sel { background:var(--card); color:var(--text); border:1px solid var(--border);
+  border-radius:6px; padding:5px 8px; font-family:var(--mono); font-size:12px; max-width:210px; cursor:pointer; }
+.emp-tag { display:inline-block; margin-left:6px; padding:0 7px; border-radius:8px; font-size:10px;
+  background:rgba(56,139,253,.15); color:#388bfd; font-family:var(--mono); }
+.emp-band td { background:rgba(0,212,170,.10); color:var(--accent); font-family:var(--mono); font-size:12px;
+  font-weight:600; letter-spacing:.4px; padding:9px 12px; border-top:2px solid var(--accent); }
+.emp-sub td  { background:rgba(255,255,255,.04); font-family:var(--mono); font-size:12px; font-weight:600; text-align:center; }
+@media (max-width:768px) { .emp-sel { max-width:112px; font-size:11px; padding:4px 6px; } }
 </style>
 </head>
 <body>
@@ -342,6 +351,7 @@ body.rol-jefe .nav-item[data-page="usuarios"] {
       <div class="hdr-module" id="hdrModule">Panel de Administración</div>
     </div>
     <div class="hdr-right">
+    <select id="selEmpresa" class="emp-sel" title="Empresa" style="display:none"></select>
     <div id="sessionBar">
       <div class="sess-dot"></div>
       <span id="sessionCountdown"></span>
@@ -884,6 +894,7 @@ body.rol-jefe .nav-item[data-page="usuarios"] {
       </div>
       <div id="tab-laboral" class="tab-content" style="display:none">
         <div class="form-grid">
+          <div class="form-field full"><label>Empresa *</label><select id="tEmpresa"></select></div>
           <div class="form-field"><label>Cargo *</label><input id="tCargo" placeholder="Técnico de campo"></div>
           <div class="form-field"><label>Área</label><input id="tArea" placeholder="Operaciones"></div>
           <div class="form-field"><label>Tipo de trabajador *</label>
@@ -1332,6 +1343,100 @@ let _idleTimer    = null;
 let _lastActivity = Date.now();
 
 // ── API helpers ───────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+//  MULTIEMPRESA
+//  Todos los usuarios ven todas las empresas; el selector del header
+//  filtra la vista. empresaFiltro === null  ->  todas las empresas.
+// ═══════════════════════════════════════════════════════════════
+let allEmpresas   = [];
+let empresaFiltro = null;
+
+const _lsGet = k => { try { return localStorage.getItem(k); } catch { return null; } };
+const _lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+
+function empresaPorId(id)  { return allEmpresas.find(e => e.id === id) || null; }
+function empresaNombre(id) { const e = empresaPorId(id); return e ? (e.nombre_comercial || e.razon_social) : ''; }
+function empresaRazon(id)  { const e = empresaPorId(id); return e ? e.razon_social : ''; }
+function empresaRuc(id)    { const e = empresaPorId(id); return e ? e.ruc : ''; }
+function multiEmpresa()    { return allEmpresas.length > 1; }
+
+// Etiqueta junto al nombre cuando se están viendo todas las empresas
+function empresaTag(id) {
+  if (empresaFiltro !== null || !multiEmpresa() || id == null) return '';
+  return ` <span class="emp-tag">${empresaNombre(id)}</span>`;
+}
+// Empresas presentes en un conjunto de filas (para encabezados de exportación)
+function empresasDe(data) {
+  const ids = [...new Set(data.map(r => r.empresa_id).filter(id => id != null))].sort((a, b) => a - b);
+  return ids.map(empresaPorId).filter(Boolean);
+}
+// Agrupa filas por empresa (ordenadas por id). Sin empresas cargadas -> un único grupo sin cabecera.
+function agruparPorEmpresa(data) {
+  if (!allEmpresas.length) return [{ emp: null, id: 0, rows: data }];
+  const mapa = new Map();
+  data.forEach(r => { const k = r.empresa_id ?? 0; if (!mapa.has(k)) mapa.set(k, []); mapa.get(k).push(r); });
+  return [...mapa.keys()].sort((a, b) => a - b).map(k => ({ emp: empresaPorId(k), id: k, rows: mapa.get(k) }));
+}
+function etiquetaEmpresa(g) { return g.emp ? `${g.emp.razon_social} — RUC ${g.emp.ruc}` : 'Sin empresa asignada'; }
+function bandaEmpresa(g, cols, detalle = '') {
+  return `<tr class="emp-band"><td colspan="${cols}">${etiquetaEmpresa(g)}${detalle}</td></tr>`;
+}
+// Con "Todas las empresas" los reportes se muestran con quiebre por empresa
+function conQuiebreEmpresa() { return empresaFiltro === null && multiEmpresa(); }
+function subtotalResumen(g) {
+  const sum = k => g.rows.reduce((s, r) => s + (Number(r[k]) || 0), 0);
+  const nom = g.emp ? (g.emp.nombre_comercial || g.emp.razon_social) : 'Sin empresa';
+  return `<tr class="emp-sub"><td colspan="3" style="text-align:left">Total ${nom} · ${g.rows.length} trabajador(es)</td>
+    <td>${sum('dias_asistidos')}</td><td>${sum('dias_falta')}</td><td>${sum('dias_tardanza')}</td>
+    <td>${sum('dias_permiso_goce')}</td><td>${sum('dias_vacaciones')}</td>
+    <td>${sum('total_horas_trabajadas').toFixed(2)} h</td><td>${sum('total_min_tardanza')}</td><td>${sum('total_min_horas_extra')}</td><td></td></tr>`;
+}
+
+function trabFiltrados() {
+  return empresaFiltro === null ? allTrab : allTrab.filter(t => t.empresa_id === empresaFiltro);
+}
+// Fragmentos de consulta PostgREST
+function qEmp()        { return empresaFiltro === null ? '' : `&empresa_id=eq.${empresaFiltro}`; }
+function qTrabEmp()    { return empresaFiltro === null ? '' : `&trabajadores.empresa_id=eq.${empresaFiltro}`; }
+function embTrab(cols) { return `trabajadores${empresaFiltro === null ? '' : '!inner'}(${cols})`; }
+
+function poblarSelectoresEmpresa() {
+  const opts = allEmpresas.map(e => `<option value="${e.id}">${e.nombre_comercial || e.razon_social}</option>`).join('');
+  const sel = document.getElementById('selEmpresa');
+  if (sel) {
+    sel.innerHTML = '<option value="">Todas las empresas</option>' + opts;
+    sel.value = empresaFiltro === null ? '' : String(empresaFiltro);
+    sel.style.display = multiEmpresa() ? '' : 'none';
+  }
+  const te = document.getElementById('tEmpresa'); if (te) te.innerHTML = opts;
+}
+
+async function cargarEmpresas() {
+  try {
+    allEmpresas = await sbGet('empresas', 'select=id,ruc,razon_social,nombre_comercial&activo=eq.true&order=id.asc');
+  } catch (e) {
+    allEmpresas = [];
+    console.warn('No se pudo cargar empresas:', e.message);
+  }
+  const guardada = parseInt(_lsGet('telnetsp_empresa') || '');
+  empresaFiltro = empresaPorId(guardada) ? guardada : null;
+  poblarSelectoresEmpresa();
+}
+
+function recargarPorEmpresa() {
+  actualizarStats(trabFiltrados());
+  renderTrab(allTrab);
+  poblarSelectTrab();
+  cargarAsignaciones();
+  cargarPermisos();
+  verificarPermisosPendientes();
+  cargarMarcaciones();
+  cargarAlertasIncompletas();
+  // Reportes: si ya había uno en pantalla, recargarlo con la empresa elegida
+  if (reporteData.length) document.getElementById('btnCargarReporte').click();
+  if (detalleData.length) document.getElementById('btnCargarDetalle').click();
+}
+
 async function sbGet(table, params = '') {
   const r = await fetch(`${SB_URL}/rest/v1/${table}?${params}`, { headers: HEADERS });
   if (!r.ok) throw new Error(await r.text());
@@ -1539,12 +1644,21 @@ function iniciarApp() {
   // Iniciar timers de sesión y heartbeat de auditoría
   iniciarTimersSesion();
 
-  cargarTrabajadores();
-  cargarHorarios();
-  verificarPermisosPendientes();
-  poblarFiltroDetalleTrab();
-  cargarAlertasIncompletas();
+  // Primero las empresas: el resto de las cargas depende del filtro
+  cargarEmpresas().finally(() => {
+    cargarTrabajadores();
+    cargarHorarios();
+    verificarPermisosPendientes();
+    poblarFiltroDetalleTrab();
+    cargarAlertasIncompletas();
+  });
 }
+
+document.getElementById('selEmpresa').addEventListener('change', e => {
+  empresaFiltro = e.target.value === '' ? null : parseInt(e.target.value);
+  _lsSet('telnetsp_empresa', e.target.value);
+  recargarPorEmpresa();
+});
 
 document.getElementById('btnLogout').addEventListener('click', async () => {
   await auditLog('LOGOUT', 'sistema');
@@ -1571,9 +1685,10 @@ document.querySelectorAll('.nav-item[data-page]').forEach(item => {
       document.getElementById('filtroFotosFecha').value = hoy;
       // Poblar select de trabajadores
       const sel = document.getElementById('filtroFotosTrab');
-      if (sel && allTrab.length > 0 && sel.options.length <= 1) {
+      if (sel && allTrab.length > 0 && (sel.options.length <= 1 || sel.dataset.emp !== String(empresaFiltro))) {
+        sel.dataset.emp = String(empresaFiltro);
         sel.innerHTML = '<option value="">Todos los trabajadores</option>' +
-          allTrab.filter(t=>t.activo).map(t =>
+          trabFiltrados().filter(t=>t.activo).map(t =>
             `<option value="${t.id}">${t.nombres} ${t.apellido_paterno}</option>`
           ).join('');
       }
@@ -1635,8 +1750,9 @@ async function cargarTrabajadores() {
   try {
     const data = await sbGet('trabajadores', 'select=*,asignacion_horarios(fecha_desde,fecha_hasta,horarios(nombre))&order=apellido_paterno.asc');
     allTrab = data;
-    actualizarStats(data);
+    actualizarStats(trabFiltrados());
     renderTrab(data);
+    poblarFiltroDetalleTrab();
   } catch(e) { toast('Error cargando trabajadores: ' + e.message, 'error'); }
 }
 
@@ -1663,6 +1779,7 @@ function renderTrab(data) {
   const tipo   = document.getElementById('filtroTipo').value;
   const estado = document.getElementById('filtroEstado').value;
   const filtered = data.filter(t => {
+    if (empresaFiltro !== null && t.empresa_id !== empresaFiltro) return false;
     const nombre = `${t.nombres} ${t.apellido_paterno} ${t.apellido_materno||''} ${t.dni} ${t.cargo}`.toLowerCase();
     if (q && !nombre.includes(q)) return false;
     if (tipo && t.tipo_trabajador !== tipo) return false;
@@ -1678,7 +1795,7 @@ function renderTrab(data) {
   tbody.innerHTML = filtered.map(t => `
     <tr>
       <td style="font-family:var(--mono);color:var(--muted)">${t.dni}</td>
-      <td><strong>${t.nombres} ${t.apellido_paterno}</strong><br><span style="font-size:11px;color:var(--muted)">${t.cargo||'—'}</span></td>
+      <td><strong>${t.nombres} ${t.apellido_paterno}</strong><br><span style="font-size:11px;color:var(--muted)">${t.cargo||'—'}${empresaTag(t.empresa_id)}</span></td>
       <td style="color:var(--muted);font-size:12px">${t.cargo||'—'}</td>
       <td>${badgeTipo(t.tipo_trabajador)}</td>
       <td style="font-size:12px">${getHorarioVigente(t)}</td>
@@ -1704,6 +1821,7 @@ document.getElementById('btnNuevoTrab').addEventListener('click', () => {
   editingId = null;
   document.getElementById('modalTrabTitle').textContent = 'Nuevo trabajador';
   limpiarModalTrab();
+  document.getElementById('tEmpresa').value = String(empresaFiltro ?? allEmpresas[0]?.id ?? 1);
   document.getElementById('tFechaIngreso').value = new Date().toISOString().slice(0,10);
   abrirModal('modalTrab');
 });
@@ -1745,6 +1863,7 @@ function editarTrab(id) {
   if (!t) return;
   editingId = id;
   document.getElementById('modalTrabTitle').textContent = 'Editar trabajador';
+  document.getElementById('tEmpresa').value = String(t.empresa_id ?? 1);
   document.getElementById('tDni').value          = t.dni || '';
   document.getElementById('tBioId').value        = t.bio_id || '';
   document.getElementById('tPin').value          = t.pin || '';
@@ -1789,7 +1908,7 @@ document.getElementById('btnGuardarTrab').addEventListener('click', async () => 
     toast('DNI, Nombres y Apellido paterno son obligatorios', 'error'); return;
   }
   const body = {
-    empresa_id:         1,
+    empresa_id:         parseInt(document.getElementById('tEmpresa').value) || 1,
     bio_id:             document.getElementById('tBioId').value.trim() || null,
     pin:                document.getElementById('tPin').value.trim() || null,
     dni,
@@ -1883,7 +2002,7 @@ async function cargarHorarios() {
 function poblarSelectTrab() {
   poblarFiltroDetalleTrab();
   const opts = '<option value="">— Seleccionar —</option>' +
-    allTrab.filter(t => t.activo).map(t => `<option value="${t.id}">${t.nombres} ${t.apellido_paterno} (${t.dni})</option>`).join('');
+    trabFiltrados().filter(t => t.activo).map(t => `<option value="${t.id}">${t.nombres} ${t.apellido_paterno} (${t.dni})</option>`).join('');
   ['aTrabajador','pTrabajador','emTrabajador'].forEach(id => { document.getElementById(id).innerHTML = opts; });
 }
 function poblarSelectHorarios() {
@@ -1966,7 +2085,7 @@ document.getElementById('btnGuardarHorario').addEventListener('click', async () 
 async function cargarAsignaciones() {
   try {
     const data = await sbGet('asignacion_horarios',
-      'select=*,trabajadores(nombres,apellido_paterno,dni),horarios(codigo,nombre)&order=fecha_desde.desc');
+      `select=*,${embTrab('nombres,apellido_paterno,dni')},horarios(codigo,nombre)&order=fecha_desde.desc${qTrabEmp()}`);
     const tbody = document.getElementById('tbodyAsig');
     tbody.innerHTML = data.map(a => `
       <tr>
@@ -2022,7 +2141,7 @@ async function eliminarAsig(id) {
 async function cargarPermisos() {
   try {
     const estado = document.getElementById('filtroEstadoPerm').value;
-    let params = 'select=*,trabajadores(nombres,apellido_paterno,dni)&order=creado_en.desc';
+    let params = `select=*,${embTrab('nombres,apellido_paterno,dni')}&order=creado_en.desc${qTrabEmp()}`;
     if (estado) params += `&estado=eq.${estado}`;
     const data = await sbGet('permisos', params);
     const tbody = document.getElementById('tbodyPermisos');
@@ -2047,7 +2166,7 @@ async function cargarPermisos() {
 
 async function verificarPermisosPendientes() {
   try {
-    const data = await sbGet('permisos', 'select=id&estado=eq.Pendiente');
+    const data = await sbGet('permisos', `select=id,${embTrab('id')}&estado=eq.Pendiente${qTrabEmp()}`);
     const badge = document.getElementById('badgePermisos');
     if (data.length > 0) { badge.textContent = data.length; badge.classList.add('visible'); }
     else badge.classList.remove('visible');
@@ -2184,7 +2303,7 @@ async function cargarMarcaciones() {
   const q     = document.getElementById('searchMarca').value.trim();
   if (!fecha && !q) return;
   try {
-    let params = 'select=id,trabajador_id,bio_id,dni,fecha,hora,tipo,fuente,ubicacion,maps_url,foto_url,estado,trabajadores(nombres,apellido_paterno)&order=hora.asc&estado=eq.Activo';
+    let params = `select=id,trabajador_id,bio_id,dni,fecha,hora,tipo,fuente,ubicacion,maps_url,foto_url,estado,${embTrab('nombres,apellido_paterno')}&order=hora.asc&estado=eq.Activo${qTrabEmp()}`;
     if (fecha) params += `&fecha=eq.${fecha}`;
     if (q)     params += `&dni=ilike.*${q}*`;
     const data = await sbGet('marcaciones', params);
@@ -2376,7 +2495,7 @@ document.getElementById('btnCargarReporte').addEventListener('click', async () =
   btn.innerHTML = '<span class="spinner"></span> Cargando…'; btn.disabled = true;
   try {
     reporteData = await sbGet('v_resumen_asistencia_mensual',
-      `mes=eq.${mes}-01&order=nombre_completo.asc&select=*`);
+      `mes=eq.${mes}-01&order=nombre_completo.asc&select=*${qEmp()}`);
     renderResumen(reporteData);
     document.getElementById('btnExportCSV').style.display = reporteData.length ? '' : 'none';
     document.getElementById('btnExportXLS').style.display = reporteData.length ? '' : 'none';
@@ -2419,7 +2538,7 @@ function renderResumen(data) {
   document.getElementById('rStatExtra').textContent = (totExtra/60).toFixed(1)+'h';
   document.getElementById('statsReporte').style.display = 'grid';
 
-  tbody.innerHTML = rows.map(r => {
+  const filaResumen = r => {
     const obs = [];
     if ((r.dias_permiso_goce||0) > 0)  obs.push(`Permiso c/goce: ${r.dias_permiso_goce}d`);
     if ((r.dias_vacaciones||0) > 0)    obs.push(`Vacaciones: ${r.dias_vacaciones}d`);
@@ -2439,7 +2558,10 @@ function renderResumen(data) {
       <td style="font-family:var(--mono);text-align:center;color:${(r.total_min_horas_extra||0)>0?'var(--success)':'inherit'}">${r.total_min_horas_extra||0}</td>
       <td style="font-size:11px;color:var(--muted)">${obs.join(' | ') || '—'}</td>
     </tr>`;
-  }).join('');
+  };
+  tbody.innerHTML = conQuiebreEmpresa()
+    ? agruparPorEmpresa(rows).map(g => bandaEmpresa(g, 12) + g.rows.map(filaResumen).join('') + subtotalResumen(g)).join('')
+    : rows.map(filaResumen).join('');
 
   // Totales
   const fmt = (n, dec=2) => parseFloat(n||0).toFixed(dec);
@@ -2468,7 +2590,7 @@ document.getElementById('btnCargarDetalle').addEventListener('click', async () =
   const btn = document.getElementById('btnCargarDetalle');
   btn.innerHTML = '<span class="spinner"></span> Cargando…'; btn.disabled = true;
   try {
-    let params = `fecha=gte.${desde}&fecha=lte.${hasta}&order=fecha.asc,nombre_completo.asc&select=*`;
+    let params = `fecha=gte.${desde}&fecha=lte.${hasta}&order=fecha.asc,nombre_completo.asc&select=*${qEmp()}`;
     if (trab) params += `&trabajador_id=eq.${trab}`;
     detalleData = await sbGet('v_reporte_asistencia_detalle', params);
     renderDetalle(detalleData);
@@ -2505,7 +2627,7 @@ function renderDetalle(data) {
     tbody.innerHTML = `<tr><td colspan="13"><div class="empty-state"><div class="empty-ico">📅</div><p>Sin datos para este rango</p></div></td></tr>`;
     return;
   }
-  tbody.innerHTML = data.map(r => {
+  const filaDetalle = r => {
     // Observaciones automáticas según estado
     const estadosObs = {
       'Permiso con goce':    'Permiso con goce de haber',
@@ -2537,7 +2659,10 @@ function renderDetalle(data) {
       <td>${estadoDiaBadge(r.estado_dia)}</td>
       <td style="font-size:11px;color:var(--muted)">${obs}</td>
     </tr>`;
-  }).join('');
+  };
+  tbody.innerHTML = conQuiebreEmpresa()
+    ? agruparPorEmpresa(data).map(g => bandaEmpresa(g, 12, ` · ${g.rows.length} registros`) + g.rows.map(filaDetalle).join('')).join('')
+    : data.map(filaDetalle).join('');
 }
 
 // Poblar select de trabajadores en detalle
@@ -2547,7 +2672,7 @@ async function poblarFiltroDetalleTrab() {
   // Si allTrab ya está cargado usarlo directamente
   if (allTrab.length > 0) {
     sel.innerHTML = '<option value="">Todos</option>' +
-      allTrab.filter(t=>t.activo).map(t =>
+      trabFiltrados().filter(t=>t.activo).map(t =>
         `<option value="${t.id}">${t.nombres} ${t.apellido_paterno} (${t.dni})</option>`
       ).join('');
     return;
@@ -2555,7 +2680,7 @@ async function poblarFiltroDetalleTrab() {
   // Si no, cargar desde Supabase
   try {
     const data = await sbGet('trabajadores',
-      'select=id,nombres,apellido_paterno,dni&activo=eq.true&order=apellido_paterno.asc');
+      'select=id,nombres,apellido_paterno,dni&activo=eq.true&order=apellido_paterno.asc' + qEmp());
     sel.innerHTML = '<option value="">Todos</option>' +
       data.map(t =>
         `<option value="${t.id}">${t.nombres} ${t.apellido_paterno} (${t.dni})</option>`
@@ -2570,8 +2695,8 @@ function exportarCSV() {
   let headers, rows, filename;
   if (reporteActivo === 'resumen') {
     headers = ['DNI','Nombre','Cargo','Tipo','Dias Asistidos','Dias Falta','Dias Tardanza',
-               'Horas Trabajadas','Min Tardanza','Desc Tardanza S/','Min H.Extra','Monto H.Extra S/','Sueldo Base S/'];
-    rows = reporteData.map(r => [
+               'Horas Trabajadas','Min Tardanza','Desc Tardanza S/','Min H.Extra','Monto H.Extra S/','Sueldo Base S/','Empresa','RUC'];
+    rows = [...reporteData].sort((a,b) => (a.empresa_id||0) - (b.empresa_id||0)).map(r => [
       r.dni, r.nombre_completo, r.cargo, r.tipo_trabajador,
       r.dias_asistidos||0, r.dias_falta||0, r.dias_tardanza||0,
       r.total_horas_trabajadas||0, r.total_min_tardanza||0,
@@ -2579,13 +2704,14 @@ function exportarCSV() {
       r.total_min_horas_extra||0,
       parseFloat(r.monto_horas_extra||0).toFixed(2),
       parseFloat(r.sueldo_base||0).toFixed(2),
+      empresaRazon(r.empresa_id), empresaRuc(r.empresa_id),
     ]);
     filename = `Resumen_Asistencia_${document.getElementById('filtroMesReporte').value}.csv`;
   } else {
     headers = ['Fecha','Trabajador','Cargo','Entrada Prog','Salida Prog',
                'Primera Entrada','Ultima Salida','Horas Trab','Tard Min',
-               'Desc Tard S/','Extra Min','Extra S/','Estado'];
-    rows = detalleData.map(r => [
+               'Desc Tard S/','Extra Min','Extra S/','Estado','Empresa','RUC'];
+    rows = [...detalleData].sort((a,b) => (a.empresa_id||0) - (b.empresa_id||0)).map(r => [
       r.fecha, r.nombre_completo, r.cargo,
       r.hora_prog_entrada||'', r.hora_prog_salida||'',
       r.primera_entrada||'', r.ultima_salida||'',
@@ -2594,6 +2720,7 @@ function exportarCSV() {
       r.horas_extra_min||0,
       parseFloat(r.monto_horas_extra||0).toFixed(2),
       r.estado_dia||'',
+      empresaRazon(r.empresa_id), empresaRuc(r.empresa_id),
     ]);
     filename = `Detalle_Asistencia_${document.getElementById('filtroDetalleDesde').value}_al_${document.getElementById('filtroDetalleHasta').value}.csv`;
   }
@@ -2601,7 +2728,7 @@ function exportarCSV() {
   const bom  = String.fromCharCode(0xFEFF);
   const csv  = bom + [headers, ...rows].map(r =>
     r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')
-  ).join('\\r\\n');
+  ).join('\r\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
@@ -2611,16 +2738,24 @@ function exportarCSV() {
 }
 
 function exportarExcel() {
-  let headers, bodyRows, filename;
+  const esResumen = reporteActivo === 'resumen';
+  const grupos    = agruparPorEmpresa(esResumen ? reporteData : detalleData);
+  const variasEmp = grupos.length > 1;
+  const nombreEmp = g => g.emp ? (g.emp.nombre_comercial || g.emp.razon_social) : 'Sin empresa';
+  let headers, bodyRows = '', filename;
+
+  // Cabecera de cada empresa: razón social + RUC
+  const bandaXls = g => g.emp
+    ? `<tr><td colspan="${headers.length}" style="background:#1F4E79;color:white;font-weight:bold;font-size:13px;padding:7px 8px;border:1px solid #0d3661">${g.emp.razon_social} — RUC ${g.emp.ruc}</td></tr>`
+    : '';
 
   // ── RESUMEN MENSUAL ────────────────────────────────────────────
-  if (reporteActivo === 'resumen') {
-    // Columnas: sin Desc Tardanza S/, Monto H.Extra S/ ni Sueldo Base S/
+  if (esResumen) {
     headers = ['DNI','Nombre Completo','Cargo','Tipo',
                'Dias Asistidos','Dias Falta','Dias Tardanza',
                'Horas Trabajadas','Min Tardanza','Min H.Extra'];
 
-    const dataRows = reporteData.map(r => [
+    const filaDe = r => [
       r.dni, r.nombre_completo, r.cargo, r.tipo_trabajador,
       r.dias_asistidos    || 0,
       r.dias_falta        || 0,
@@ -2628,28 +2763,27 @@ function exportarExcel() {
       r.total_horas_trabajadas || 0,
       r.total_min_tardanza     || 0,
       r.total_min_horas_extra  || 0,
-    ]);
+    ];
+    const celda = (v, ci, base) =>
+      `<td style="${base}${ci>=4&&ci<=6?'text-align:center;':''}${ci>=7&&ci<=9?'text-align:right;':''}">${v}</td>`;
 
     // Fila de totales — columnas 4, 5, 6 (Asistidos, Falta, Tardanza)
-    const totalAsistidos = dataRows.reduce((s,r) => s + Number(r[4]), 0);
-    const totalFaltas    = dataRows.reduce((s,r) => s + Number(r[5]), 0);
-    const totalTardanzas = dataRows.reduce((s,r) => s + Number(r[6]), 0);
-    const filaTotal = ['','TOTALES','','',
-      totalAsistidos, totalFaltas, totalTardanzas, '', '', ''];
+    const trTotal = (etiqueta, filas) => {
+      const suma = ci => filas.reduce((s, r) => s + Number(r[ci]), 0);
+      const fila = ['', etiqueta, '', '', suma(4), suma(5), suma(6), '', '', ''];
+      return `<tr style="background:#1F4E79;color:white;font-weight:bold">${fila.map((v, ci) => celda(v, ci, 'padding:5px 8px;border:1px solid #0d3661;')).join('')}</tr>`;
+    };
 
-    // Construir HTML de filas de datos + fila total
-    const trDatos = dataRows.map((r,i) =>
-      `<tr style="background:${i%2===0?'#ffffff':'#f9f9f9'}">
-        ${r.map((v,ci) => `<td style="padding:4px 8px;border:1px solid #ddd;${ci>=4&&ci<=6?'text-align:center;':''}${ci>=7?'text-align:right;':''}">${v}</td>`).join('')}
-      </tr>`
-    ).join('');
-
-    const trTotal =
-      `<tr style="background:#1F4E79;color:white;font-weight:bold">
-        ${filaTotal.map((v,ci) => `<td style="padding:5px 8px;border:1px solid #0d3661;${ci>=4&&ci<=6?'text-align:center;':''}${ci>=7?'text-align:right;':''}">${v}</td>`).join('')}
-      </tr>`;
-
-    bodyRows = trDatos + trTotal;
+    const todas = [];
+    grupos.forEach(g => {
+      const filas = g.rows.map(filaDe);
+      todas.push(...filas);
+      bodyRows += bandaXls(g) + filas.map((r, i) =>
+        `<tr style="background:${i%2===0?'#ffffff':'#f9f9f9'}">${r.map((v, ci) => celda(v, ci, 'padding:4px 8px;border:1px solid #ddd;')).join('')}</tr>`
+      ).join('');
+      if (variasEmp) bodyRows += trTotal('TOTAL ' + nombreEmp(g), filas);
+    });
+    bodyRows += trTotal(variasEmp ? 'TOTAL GENERAL' : 'TOTALES', todas);
     filename = `Resumen_Asistencia_${document.getElementById('filtroMesReporte').value}.xls`;
 
   // ── DETALLE DIARIO ─────────────────────────────────────────────
@@ -2658,28 +2792,30 @@ function exportarExcel() {
                'Primera Entrada','Ultima Salida','Horas Trab','Tard Min',
                'Extra Min','Estado'];
 
-    // Ordenar por trabajador, luego por fecha
-    const sorted = [...detalleData].sort((a,b) => {
-      const nt = (a.nombre_completo||'').localeCompare(b.nombre_completo||'');
-      if (nt !== 0) return nt;
-      return (a.fecha||'').localeCompare(b.fecha||'');
-    });
+    grupos.forEach((g, gi) => {
+      bodyRows += bandaXls(g);
 
-    // Agrupar por trabajador y generar filas con quiebre + subtotal
-    let trAll = '';
-    let i = 0;
-    while (i < sorted.length) {
-      const trabNombre = sorted[i].nombre_completo;
-      const grupo = [];
-      while (i < sorted.length && sorted[i].nombre_completo === trabNombre) {
-        grupo.push(sorted[i]);
-        i++;
-      }
+      // Ordenar por trabajador, luego por fecha
+      const sorted = [...g.rows].sort((a,b) => {
+        const nt = (a.nombre_completo||'').localeCompare(b.nombre_completo||'');
+        if (nt !== 0) return nt;
+        return (a.fecha||'').localeCompare(b.fecha||'');
+      });
 
-      // Filas del grupo
-      grupo.forEach((r, gi) => {
-        const bg = gi % 2 === 0 ? '#ffffff' : '#f0f4f8';
-        trAll += `<tr style="background:${bg}">
+      // Agrupar por trabajador y generar filas con quiebre + subtotal
+      let i = 0, trabajadoresEmp = 0;
+      while (i < sorted.length) {
+        const trabNombre = sorted[i].nombre_completo;
+        const grupo = [];
+        while (i < sorted.length && sorted[i].nombre_completo === trabNombre) {
+          grupo.push(sorted[i]);
+          i++;
+        }
+        trabajadoresEmp++;
+
+        grupo.forEach((r, gi2) => {
+          const bg = gi2 % 2 === 0 ? '#ffffff' : '#f0f4f8';
+          bodyRows += `<tr style="background:${bg}">
           <td style="padding:4px 8px;border:1px solid #ddd;font-family:monospace">${r.fecha||''}</td>
           <td style="padding:4px 8px;border:1px solid #ddd">${r.nombre_completo||''}</td>
           <td style="padding:4px 8px;border:1px solid #ddd;font-size:11px;color:#555">${r.cargo||''}</td>
@@ -2692,26 +2828,38 @@ function exportarExcel() {
           <td style="padding:4px 8px;border:1px solid #ddd;text-align:right">${r.horas_extra_min||0}</td>
           <td style="padding:4px 8px;border:1px solid #ddd;text-align:center">${r.estado_dia||''}</td>
         </tr>`;
-      });
+        });
 
-      // Fila de subtotal del trabajador
-      const diasTrab = grupo.length;
-      trAll += `<tr style="background:#2E75B6;color:white;font-weight:bold">
+        // Fila de subtotal del trabajador
+        bodyRows += `<tr style="background:#2E75B6;color:white;font-weight:bold">
         <td colspan="2" style="padding:4px 8px;border:1px solid #1a5a9e">
           Cuenta ${trabNombre}
         </td>
         <td colspan="5" style="padding:4px 8px;border:1px solid #1a5a9e"></td>
-        <td style="padding:4px 8px;border:1px solid #1a5a9e;text-align:center">${diasTrab}</td>
+        <td style="padding:4px 8px;border:1px solid #1a5a9e;text-align:center">${grupo.length}</td>
         <td colspan="3" style="padding:4px 8px;border:1px solid #1a5a9e"></td>
       </tr>`;
 
-      // Fila separadora entre grupos
-      if (i < sorted.length) {
-        trAll += `<tr><td colspan="${headers.length}" style="padding:2px;background:#e8edf2;border:none"></td></tr>`;
+        // Fila separadora entre trabajadores
+        if (i < sorted.length) {
+          bodyRows += `<tr><td colspan="${headers.length}" style="padding:2px;background:#e8edf2;border:none"></td></tr>`;
+        }
       }
-    }
 
-    bodyRows = trAll;
+      // Total de la empresa (solo cuando el archivo trae más de una)
+      if (variasEmp) {
+        bodyRows += `<tr style="background:#1F4E79;color:white;font-weight:bold">
+        <td colspan="7" style="padding:5px 8px;border:1px solid #0d3661">TOTAL ${nombreEmp(g)} — ${trabajadoresEmp} trabajador(es)</td>
+        <td style="padding:5px 8px;border:1px solid #0d3661;text-align:center">${sorted.length}</td>
+        <td colspan="3" style="padding:5px 8px;border:1px solid #0d3661"></td>
+      </tr>`;
+      }
+      // Separador entre empresas
+      if (gi < grupos.length - 1) {
+        bodyRows += `<tr><td colspan="${headers.length}" style="padding:6px;background:#cfd8e3;border:none"></td></tr>`;
+      }
+    });
+
     filename = `Detalle_${document.getElementById('filtroDetalleDesde').value}_al_${document.getElementById('filtroDetalleHasta').value}.xls`;
   }
 
@@ -2870,7 +3018,7 @@ function iniciarPaginaFotos() {
   // Poblar selector de trabajadores
   const sel = document.getElementById('fotosTrab');
   sel.innerHTML = '<option value="">Todos</option>' +
-    allTrab.filter(t=>t.activo).map(t =>
+    trabFiltrados().filter(t=>t.activo).map(t =>
       `<option value="${t.id}">${t.nombres} ${t.apellido_paterno} (${t.dni})</option>`
     ).join('');
 }
@@ -2889,7 +3037,7 @@ async function cargarFotos() {
   btn.disabled  = true;
 
   try {
-    let params = `fecha=eq.${fecha}&foto_url=not.is.null&estado=eq.Activo&select=id,dni,fecha,hora,tipo,foto_url,ubicacion,trabajadores(nombres,apellido_paterno)&order=hora.asc`;
+    let params = `fecha=eq.${fecha}&foto_url=not.is.null&estado=eq.Activo&select=id,dni,fecha,hora,tipo,foto_url,ubicacion,${embTrab('nombres,apellido_paterno')}&order=hora.asc${qTrabEmp()}`;
     if (trabId) params += `&trabajador_id=eq.${trabId}`;
     if (tipo)   params += `&tipo=eq.${tipo}`;
 
@@ -3125,7 +3273,7 @@ async function cargarAlertasIncompletas() {
 
     // Paso 1: obtener periodos incompletos con datos del trabajador
     const periodos = await sbGet('periodos_laborales',
-      `estado_dia=in.(Sin salida,Sin entrada)&fecha=gte.${ayer}&select=trabajador_id,fecha,primera_entrada,ultima_salida,sesiones,estado_dia,trabajadores(id,dni,nombres,apellido_paterno,cargo,tipo_trabajador)&order=fecha.desc`
+      `estado_dia=in.(Sin salida,Sin entrada)&fecha=gte.${ayer}&select=trabajador_id,fecha,primera_entrada,ultima_salida,sesiones,estado_dia,${embTrab('id,dni,nombres,apellido_paterno,cargo,tipo_trabajador')}&order=fecha.desc${qTrabEmp()}`
     );
 
     if (!periodos.length) {
@@ -3355,7 +3503,7 @@ async function cargarGaleriaFotos() {
   btn.innerHTML = '<span class="spinner"></span>'; btn.disabled = true;
 
   try {
-    let params = `fecha=eq.${fecha}&fuente=eq.App&estado=eq.Activo&select=id,dni,fecha,hora,tipo,foto_url,ubicacion,trabajadores(nombres,apellido_paterno)&order=hora.asc`;
+    let params = `fecha=eq.${fecha}&fuente=eq.App&estado=eq.Activo&select=id,dni,fecha,hora,tipo,foto_url,ubicacion,${embTrab('nombres,apellido_paterno')}&order=hora.asc${qTrabEmp()}`;
     if (trab) params += `&trabajador_id=eq.${trab}`;
 
     const data = await sbGet('marcaciones', params);
